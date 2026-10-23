@@ -734,26 +734,49 @@ export function apply(ctx) {
       }
       if (req.method !== 'PATCH') return json(res, 405, { ok: false, error: '仅支持 GET / PATCH / DELETE' })
 
+      // Per-mental-model config: five top-level fields plus a trigger object.
+      // A partial `trigger` MERGES on the server (verified), so sending only the
+      // keys the user touched leaves mode/fact_types/budget etc. alone.
+      const TRIGGER_KEYS = [
+        'budget', 'mode', 'refresh_after_consolidation', 'refresh_cron', 'min_refresh_interval_seconds',
+        'fact_types', 'exclude_mental_models', 'exclude_mental_model_ids', 'tags_match', 'tag_groups',
+        'include_chunks', 'recall_max_tokens', 'recall_chunks_max_tokens',
+        'reflect_search_observations_max_tokens', 'reflect_search_observations_include_entities',
+        'response_schema', 'keep_trace',
+      ]
       const patch = {}
-      if (typeof body.sourceQuery === 'string') patch.source_query = body.sourceQuery
-      if (typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim()
-      if (body.maxTokens !== undefined && body.maxTokens !== null && body.maxTokens !== '') {
-        const tokens = Number(body.maxTokens)
+      // `raw` is the whole object from the advanced JSON editor; it goes through
+      // the same whitelist, so a typo cannot smuggle an unknown field upstream.
+      const source = body.raw && typeof body.raw === 'object' && !Array.isArray(body.raw) ? body.raw : body
+      if (typeof source.source_query === 'string') patch.source_query = source.source_query
+      else if (typeof source.sourceQuery === 'string') patch.source_query = source.sourceQuery
+      const name = typeof source.name === 'string' ? source.name.trim() : ''
+      if (name) patch.name = name
+      const rawTokens = source.max_tokens ?? source.maxTokens
+      if (rawTokens !== undefined && rawTokens !== null && rawTokens !== '') {
+        const tokens = Number(rawTokens)
         if (!Number.isFinite(tokens) || tokens <= 0) return json(res, 400, { ok: false, error: 'max_tokens 必须是正整数' })
         patch.max_tokens = Math.trunc(tokens)
       }
-      if (typeof body.refreshCron === 'string' && body.refreshCron.trim()) {
-        const cron = body.refreshCron.trim()
+      if (Array.isArray(source.tags)) patch.tags = source.tags.map((tag) => String(tag)).filter((tag) => tag.trim() !== '')
+
+      const triggerIn = source.trigger && typeof source.trigger === 'object' && !Array.isArray(source.trigger) ? source.trigger : null
+      const trigger = {}
+      if (triggerIn) {
+        for (const key of TRIGGER_KEYS) {
+          if (triggerIn[key] !== undefined) trigger[key] = triggerIn[key]
+        }
+      }
+      if (typeof body.refreshCron === 'string' && body.refreshCron.trim()) trigger.refresh_cron = body.refreshCron.trim()
+      if (typeof trigger.refresh_cron === 'string' && /\bH\b/.test(trigger.refresh_cron)) {
         // The server rejects Jenkins' `H`; the engine resolves it client-side
         // before creating a page. Refuse it here instead of sending a 422.
-        if (/\bH\b/.test(cron)) {
-          return json(res, 400, {
-            ok: false,
-            error: 'H 是引擎客户端侧写法，服务端不接受。这里请填具体 5 段 cron，例如 "17 * * * *"。',
-          })
-        }
-        patch.trigger = { refresh_cron: cron }
+        return json(res, 400, {
+          ok: false,
+          error: 'H 是引擎客户端侧写法，服务端不接受。这里请填具体 5 段 cron，例如 "17 * * * *"。',
+        })
       }
+      if (Object.keys(trigger).length) patch.trigger = trigger
       if (!Object.keys(patch).length) return json(res, 400, { ok: false, error: '没有要写入的变更' })
 
       const result = await upstream(file.raw, base, { method: 'PATCH', body: patch })

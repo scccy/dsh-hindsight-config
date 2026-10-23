@@ -114,7 +114,26 @@ npm publish
 - **编辑 source_query**：先 PATCH 服务端（立刻生效），若该页属于内置 taxonomy，再把同一句写入 `pages`，并在界面上回报"同时已写入客户端配置"。
 - **编辑刷新 cron**：只 PATCH 服务端，并明确提示"内置页的刷新节奏由配置里的全局策略托管，下次会话会被重推"。服务端**不接受 Jenkins 的 `H`**（引擎在客户端侧解析它），面板直接拒绝并提示填具体 5 段 cron。
 - **刷新 / 预览（dry-run）/ 清空**：纯服务端操作，与配置无关。
-- **删除**：纯服务端；内置页删掉后下次会话会被重新播种（想永久去掉请在 `pages` 里设 `false`）。
+- **删除**：纯服务端；内置页删掉后下次会被重新播种（想永久去掉请在 `pages` 里设 `false`）。
+
+### 每个心智模型自己的配置
+
+一层是 **bank 默认**（`mental_model_min_refresh_interval_seconds`、`knowledge_page_default_trigger`，在「服务端 → bank 配置」），另一层是**每一页自己的**：5 个顶层字段 + 17 个 trigger 字段。
+
+| 字段 | 面板 | 说明 |
+| --- | --- | --- |
+| `name` / `source_query` / `max_tokens` / `tags` | 表单 | 名称、提问、内容上限、标签 |
+| `trigger.mode` | 表单 | `full` 每次整篇重写 / `delta` 只做增量编辑 |
+| `trigger.budget` | 表单 | `low` / `mid` / `high`，按 `reflect_max_iterations` 的倍数 |
+| `trigger.refresh_cron` | 表单 | UTC 5 段 cron，**不接受 `H`** |
+| `trigger.refresh_after_consolidation` | 表单 | 每次观测整合后刷新；**与 `refresh_cron` 互斥**，开启会清掉 cron |
+| `trigger.min_refresh_interval_seconds` | 表单 | 两次自动刷新的最小间隔 |
+| `trigger.fact_types` | 表单 | 只检索哪些事实类型（`world` / `experience` / `observation`） |
+| `trigger.tags_match` / `tag_groups` / `exclude_mental_models` / `exclude_mental_model_ids` / `include_chunks` / `recall_max_tokens` / `recall_chunks_max_tokens` / `reflect_search_observations_*` / `response_schema` / `keep_trace` | **高级 JSON** | 其余 10 个字段在「高级 JSON」里改 |
+
+高级 JSON 编辑的是整份模型配置，Host 侧仍走白名单（未知的 `trigger` 键会被丢弃，不会透传到服务端）。
+
+服务端对 `trigger` 是**按字段合并**的：只发你改的键，其余保持不变；唯一的例外是上面那条 cron / after-consolidation 互斥。
 
 ---
 

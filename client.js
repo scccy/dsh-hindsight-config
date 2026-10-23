@@ -133,6 +133,17 @@ window.__ModuleLoader__.load({
       mmOwnWarn: '这一页不归内置分类托管：source_query 可以直接改，引擎不会覆盖。',
       mmConfigAlso: '同时已写入客户端配置',
       mmConfigWriteFailed: '服务端已改，但写客户端配置失败',
+      mmName: '名称',
+      mmTagsPlaceholder: 'tags，逗号分隔（如 knowledge:decision）',
+      mmMode: '刷新模式',
+      mmBudget: '预算',
+      mmMinInterval: '最小刷新间隔（秒）',
+      mmAfterConsolidation: '整合后刷新',
+      mmFactTypesPlaceholder: 'fact_types，如 world, experience, observation',
+      mmAdvanced: '高级 JSON',
+      mmBackToForm: '返回表单',
+      mmJsonHint: '整份心智模型配置（name / source_query / max_tokens / tags / trigger）。trigger 里还有 mode、budget、fact_types、tags_match、exclude_mental_models、keep_trace、response_schema 等 17 个字段，表单只放了常用的，其余在这里改。',
+      mmCronExclusive: '服务端把「整合后刷新」和「刷新 cron」视为互斥：开启前者会清掉 cron。',
       bankApplied: '已写入服务端',
       bankOverride: '已有覆盖',
       advanced: '高级对象',
@@ -265,6 +276,17 @@ window.__ModuleLoader__.load({
       mmOwnWarn: 'This page is not part of the seeded taxonomy: source_query is safe to edit, the engine will not overwrite it.',
       mmConfigAlso: 'Also written to the client config',
       mmConfigWriteFailed: 'Server updated, but writing the client config failed',
+      mmName: 'name',
+      mmTagsPlaceholder: 'tags, comma separated (e.g. knowledge:decision)',
+      mmMode: 'refresh mode',
+      mmBudget: 'budget',
+      mmMinInterval: 'min refresh interval (s)',
+      mmAfterConsolidation: 'refresh after consolidation',
+      mmFactTypesPlaceholder: 'fact_types, e.g. world, experience, observation',
+      mmAdvanced: 'Advanced JSON',
+      mmBackToForm: 'Back to form',
+      mmJsonHint: 'The whole mental-model config (name / source_query / max_tokens / tags / trigger). trigger carries 17 fields — mode, budget, fact_types, tags_match, exclude_mental_models, keep_trace, response_schema and more; the form shows the common ones, edit the rest here.',
+      mmCronExclusive: 'The server treats "refresh after consolidation" and "refresh cron" as mutually exclusive: turning the former on clears the cron.',
       bankApplied: 'Written to server',
       bankOverride: 'overridden',
       advanced: 'Advanced objects',
@@ -763,7 +785,7 @@ window.__ModuleLoader__.load({
             return
           }
           setModelMsg(null)
-          setModelEdit({ id: model.id, name: model.name, isTaxonomy: model.isTaxonomy, loading: true, sourceQuery: '', maxTokens: '', refreshCron: '' })
+          setModelEdit({ id: model.id, name: model.name, isTaxonomy: model.isTaxonomy, loading: true, mode: 'form', sourceQuery: '', maxTokens: '', tags: '' })
           api(`/mental-model?bankId=${encodeURIComponent(bankId)}&id=${encodeURIComponent(model.id)}`)
             .then((data) => {
               if (!data.ok) {
@@ -772,14 +794,24 @@ window.__ModuleLoader__.load({
                 return
               }
               const detail = data.model || {}
+              const trigger = detail.trigger || {}
+              const asText = (value) => (value === undefined || value === null ? '' : String(value))
               setModelEdit({
                 id: model.id,
                 name: detail.name || model.name,
                 isTaxonomy: model.isTaxonomy,
                 loading: false,
+                mode: 'form',
                 sourceQuery: detail.source_query || '',
                 maxTokens: detail.max_tokens ?? '',
-                refreshCron: detail.trigger?.refresh_cron || '',
+                tags: Array.isArray(detail.tags) ? detail.tags.join(', ') : '',
+                refreshMode: trigger.mode || '',
+                budget: trigger.budget || '',
+                refreshCron: trigger.refresh_cron || '',
+                minInterval: asText(trigger.min_refresh_interval_seconds),
+                afterConsolidation: trigger.refresh_after_consolidation === undefined || trigger.refresh_after_consolidation === null ? '' : String(trigger.refresh_after_consolidation),
+                factTypes: Array.isArray(trigger.fact_types) ? trigger.fact_types.join(', ') : '',
+                json: JSON.stringify(detail, null, 2),
               })
             })
             .catch((error) => {
@@ -1386,65 +1418,236 @@ window.__ModuleLoader__.load({
                             { style: { marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' } },
                             modelEdit.loading
                               ? h('div', { className: 'dhc-muted' }, h(Spinner), ' ', t('bankLoad'))
-                              : h(
-                                  'div',
-                                  null,
-                                  modelEdit.isTaxonomy
-                                    ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmTaxonomyWarn'))
-                                    : h('div', { className: 'dhc-muted', style: { fontSize: '11.5px' } }, t('mmOwnWarn')),
-                                  h('textarea', {
-                                    className: 'dhc-area',
-                                    rows: 3,
-                                    spellcheck: false,
-                                    placeholder: 'source_query',
-                                    style: { marginTop: '6px' },
-                                    value: modelEdit.sourceQuery,
-                                    onChange: (event) => setModelEdit((current) => ({ ...current, sourceQuery: event.target.value })),
-                                  }),
-                                  h(
+                              : modelEdit.mode === 'json'
+                                ? h(
                                     'div',
-                                    { className: 'dhc-btns', style: { marginTop: '6px' } },
-                                    h('input', {
-                                      className: 'dhc-input',
-                                      type: 'number',
-                                      placeholder: 'max_tokens',
-                                      style: { flex: '0 0 140px' },
-                                      value: modelEdit.maxTokens,
-                                      onChange: (event) => setModelEdit((current) => ({ ...current, maxTokens: event.target.value })),
+                                    null,
+                                    h('div', { className: 'dhc-muted', style: { fontSize: '11.5px' } }, t('mmJsonHint')),
+                                    h('textarea', {
+                                      className: 'dhc-area',
+                                      rows: 12,
+                                      spellcheck: false,
+                                      value: modelEdit.json,
+                                      onChange: (event) => setModelEdit((current) => ({ ...current, json: event.target.value })),
                                     }),
+                                    h(
+                                      'div',
+                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      h(
+                                        'button',
+                                        {
+                                          className: 'dhc-btn',
+                                          type: 'button',
+                                          'data-kind': 'primary',
+                                          disabled: modelBusy,
+                                          onClick: () => {
+                                            let parsed
+                                            try {
+                                              parsed = JSON.parse(modelEdit.json)
+                                            } catch (error) {
+                                              setModelMsg({ tone: 'bad', text: `JSON 语法错误：${error.message}` })
+                                              return
+                                            }
+                                            modelAction('PATCH', { id: modelEdit.id, raw: parsed }, () => setModelEdit(null))
+                                          },
+                                        },
+                                        t('save'),
+                                      ),
+                                      h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit((current) => ({ ...current, mode: 'form' })) }, t('mmBackToForm')),
+                                      h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit(null) }, t('mmCancel')),
+                                    ),
+                                  )
+                                : h(
+                                    'div',
+                                    null,
+                                    modelEdit.isTaxonomy
+                                      ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmTaxonomyWarn'))
+                                      : h('div', { className: 'dhc-muted', style: { fontSize: '11.5px' } }, t('mmOwnWarn')),
                                     h('input', {
                                       className: 'dhc-input',
                                       type: 'text',
+                                      placeholder: t('mmName'),
+                                      style: { marginTop: '6px' },
+                                      value: modelEdit.name,
+                                      onChange: (event) => setModelEdit((current) => ({ ...current, name: event.target.value })),
+                                    }),
+                                    h('textarea', {
+                                      className: 'dhc-area',
+                                      rows: 3,
                                       spellcheck: false,
-                                      placeholder: t('mmCronPlaceholder'),
-                                      style: { flex: '1 1 160px' },
-                                      value: modelEdit.refreshCron,
-                                      onChange: (event) => setModelEdit((current) => ({ ...current, refreshCron: event.target.value })),
+                                      placeholder: 'source_query',
+                                      style: { marginTop: '6px' },
+                                      value: modelEdit.sourceQuery,
+                                      onChange: (event) => setModelEdit((current) => ({ ...current, sourceQuery: event.target.value })),
                                     }),
                                     h(
-                                      'button',
-                                      {
-                                        className: 'dhc-btn',
-                                        type: 'button',
-                                        'data-kind': 'primary',
-                                        disabled: modelBusy,
-                                        onClick: () =>
-                                          modelAction(
-                                            'PATCH',
-                                            {
-                                              id: modelEdit.id,
-                                              sourceQuery: modelEdit.sourceQuery,
-                                              maxTokens: modelEdit.maxTokens === '' ? undefined : modelEdit.maxTokens,
-                                              refreshCron: modelEdit.refreshCron || undefined,
-                                            },
-                                            () => setModelEdit(null),
-                                          ),
-                                      },
-                                      t('save'),
+                                      'div',
+                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      h('input', {
+                                        className: 'dhc-input',
+                                        type: 'number',
+                                        placeholder: 'max_tokens',
+                                        style: { flex: '0 0 120px' },
+                                        value: modelEdit.maxTokens,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, maxTokens: event.target.value })),
+                                      }),
+                                      h('input', {
+                                        className: 'dhc-input',
+                                        type: 'text',
+                                        spellcheck: false,
+                                        placeholder: t('mmTagsPlaceholder'),
+                                        style: { flex: '1 1 200px' },
+                                        value: modelEdit.tags,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, tags: event.target.value })),
+                                      }),
                                     ),
-                                    h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit(null) }, t('mmCancel')),
+                                    h(
+                                      'div',
+                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      h(
+                                        'select',
+                                        {
+                                          className: 'dhc-select',
+                                          style: { flex: '0 0 120px' },
+                                          value: modelEdit.refreshMode,
+                                          onChange: (event) => setModelEdit((current) => ({ ...current, refreshMode: event.target.value })),
+                                        },
+                                        h('option', { value: '' }, `${t('mmMode')}: —`),
+                                        h('option', { value: 'full' }, 'full'),
+                                        h('option', { value: 'delta' }, 'delta'),
+                                      ),
+                                      h(
+                                        'select',
+                                        {
+                                          className: 'dhc-select',
+                                          style: { flex: '0 0 120px' },
+                                          value: modelEdit.budget,
+                                          onChange: (event) => setModelEdit((current) => ({ ...current, budget: event.target.value })),
+                                        },
+                                        h('option', { value: '' }, `${t('mmBudget')}: —`),
+                                        h('option', { value: 'low' }, 'low'),
+                                        h('option', { value: 'mid' }, 'mid'),
+                                        h('option', { value: 'high' }, 'high'),
+                                      ),
+                                      h('input', {
+                                        className: 'dhc-input',
+                                        type: 'number',
+                                        placeholder: t('mmMinInterval'),
+                                        style: { flex: '0 0 150px' },
+                                        value: modelEdit.minInterval,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, minInterval: event.target.value })),
+                                      }),
+                                      h(
+                                        'select',
+                                        {
+                                          className: 'dhc-select',
+                                          style: { flex: '0 0 150px' },
+                                          value: modelEdit.afterConsolidation,
+                                          onChange: (event) => setModelEdit((current) => ({ ...current, afterConsolidation: event.target.value })),
+                                        },
+                                        h('option', { value: '' }, `${t('mmAfterConsolidation')}: —`),
+                                        h('option', { value: 'true' }, t('on')),
+                                        h('option', { value: 'false' }, t('off')),
+                                      ),
+                                    ),
+                                    h(
+                                      'div',
+                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      h('input', {
+                                        className: 'dhc-input',
+                                        type: 'text',
+                                        spellcheck: false,
+                                        placeholder: t('mmCronPlaceholder'),
+                                        style: { flex: '1 1 180px' },
+                                        value: modelEdit.refreshCron,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, refreshCron: event.target.value })),
+                                      }),
+                                      h('input', {
+                                        className: 'dhc-input',
+                                        type: 'text',
+                                        spellcheck: false,
+                                        placeholder: t('mmFactTypesPlaceholder'),
+                                        style: { flex: '1 1 180px' },
+                                        value: modelEdit.factTypes,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, factTypes: event.target.value })),
+                                      }),
+                                    ),
+                                    modelEdit.afterConsolidation === 'true' && modelEdit.refreshCron.trim()
+                                      ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmCronExclusive'))
+                                      : null,
+                                    h(
+                                      'div',
+                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      h(
+                                        'button',
+                                        {
+                                          className: 'dhc-btn',
+                                          type: 'button',
+                                          'data-kind': 'primary',
+                                          disabled: modelBusy,
+                                          onClick: () => {
+                                            const trigger = {}
+                                            if (modelEdit.refreshMode) trigger.mode = modelEdit.refreshMode
+                                            if (modelEdit.budget) trigger.budget = modelEdit.budget
+                                            if (modelEdit.refreshCron) trigger.refresh_cron = modelEdit.refreshCron
+                                            if (modelEdit.minInterval !== '') trigger.min_refresh_interval_seconds = Number(modelEdit.minInterval)
+                                            if (modelEdit.afterConsolidation !== '') trigger.refresh_after_consolidation = modelEdit.afterConsolidation === 'true'
+                                            if (modelEdit.factTypes.trim()) {
+                                              trigger.fact_types = modelEdit.factTypes.split(',').map((part) => part.trim()).filter(Boolean)
+                                            }
+                                            modelAction(
+                                              'PATCH',
+                                              {
+                                                id: modelEdit.id,
+                                                name: modelEdit.name,
+                                                sourceQuery: modelEdit.sourceQuery,
+                                                maxTokens: modelEdit.maxTokens === '' ? undefined : modelEdit.maxTokens,
+                                                tags: modelEdit.tags
+                                                  .split(',')
+                                                  .map((part) => part.trim())
+                                                  .filter(Boolean),
+                                                trigger: Object.keys(trigger).length ? trigger : undefined,
+                                              },
+                                              () => setModelEdit(null),
+                                            )
+                                          },
+                                        },
+                                        t('save'),
+                                      ),
+                                      h(
+                                        'button',
+                                        {
+                                          className: 'dhc-btn',
+                                          type: 'button',
+                                          onClick: () =>
+                                            setModelEdit((current) => ({
+                                              ...current,
+                                              mode: 'json',
+                                              json: JSON.stringify(
+                                                {
+                                                  name: current.name,
+                                                  source_query: current.sourceQuery,
+                                                  max_tokens: current.maxTokens === '' ? null : Number(current.maxTokens),
+                                                  tags: current.tags.split(',').map((part) => part.trim()).filter(Boolean),
+                                                  trigger: {
+                                                    mode: current.refreshMode || undefined,
+                                                    budget: current.budget || undefined,
+                                                    refresh_cron: current.refreshCron || undefined,
+                                                    min_refresh_interval_seconds: current.minInterval === '' ? undefined : Number(current.minInterval),
+                                                    refresh_after_consolidation: current.afterConsolidation === '' ? undefined : current.afterConsolidation === 'true',
+                                                    fact_types: current.factTypes.trim() ? current.factTypes.split(',').map((p) => p.trim()).filter(Boolean) : undefined,
+                                                  },
+                                                },
+                                                null,
+                                                2,
+                                              ),
+                                            })),
+                                        },
+                                        t('mmAdvanced'),
+                                      ),
+                                      h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit(null) }, t('mmCancel')),
+                                    ),
                                   ),
-                                ),
                           )
                         : null,
                     ),

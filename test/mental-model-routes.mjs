@@ -140,6 +140,59 @@ try {
   const trig = (await call(`/mental-model?bankId=${enc(bank)}&id=${enc(model.id)}`))?.model?.trigger
   check('trigger.refresh_cron 已改', trig?.refresh_cron === '5 * * * *', trig?.refresh_cron)
 
+  console.log('\n5b) 面板路由：每页自己的完整配置（tags + trigger 多字段）')
+  const rich = await call('/mental-model', {
+    method: 'PATCH',
+    body: {
+      bankId: bank,
+      id: model.id,
+      name: 'Renamed page',
+      tags: ['knowledge:decision', 'team:core'],
+      trigger: {
+        mode: 'delta',
+        budget: 'mid',
+        min_refresh_interval_seconds: 600,
+        refresh_after_consolidation: true,
+        fact_types: ['world', 'observation'],
+      },
+    },
+  })
+  check('PATCH ok', rich?.ok === true, rich)
+  const full = (await call(`/mental-model?bankId=${enc(bank)}&id=${enc(model.id)}`))?.model
+  console.log(`     name=${full?.name} tags=${JSON.stringify(full?.tags)} trigger=${JSON.stringify(full?.trigger)}`)
+  check('name 已改', full?.name === 'Renamed page', full?.name)
+  check('tags 已改', JSON.stringify(full?.tags) === JSON.stringify(['knowledge:decision', 'team:core']), full?.tags)
+  check('trigger.mode', full?.trigger?.mode === 'delta', full?.trigger?.mode)
+  check('trigger.budget', full?.trigger?.budget === 'mid', full?.trigger?.budget)
+  check('trigger.min_refresh_interval_seconds', full?.trigger?.min_refresh_interval_seconds === 600, full?.trigger?.min_refresh_interval_seconds)
+  check('trigger.refresh_after_consolidation', full?.trigger?.refresh_after_consolidation === true, full?.trigger?.refresh_after_consolidation)
+  check('trigger.fact_types', JSON.stringify(full?.trigger?.fact_types) === JSON.stringify(['world', 'observation']), full?.trigger?.fact_types)
+  // The server treats refresh_cron and refresh_after_consolidation as mutually
+  // exclusive: turning the latter on clears the former. Verified here so the
+  // panel can warn instead of surprising the user.
+  check('after_consolidation=true 会清掉 refresh_cron（服务端互斥）', full?.trigger?.refresh_cron === null, full?.trigger?.refresh_cron)
+
+  console.log('\n5b2) 关掉 after_consolidation 并给回 cron，两者可以互换')
+  const back = await call('/mental-model', {
+    method: 'PATCH',
+    body: { bankId: bank, id: model.id, trigger: { refresh_after_consolidation: false, refresh_cron: '9 * * * *' } },
+  })
+  check('PATCH ok', back?.ok === true, back)
+  const backTrig = (await call(`/mental-model?bankId=${enc(bank)}&id=${enc(model.id)}`))?.model?.trigger
+  check('cron 回来了', backTrig?.refresh_cron === '9 * * * *', backTrig?.refresh_cron)
+  check('after_consolidation 已关', backTrig?.refresh_after_consolidation === false, backTrig?.refresh_after_consolidation)
+
+  console.log('\n5c) 面板路由：高级 JSON（raw）走同一套白名单')
+  const viaRaw = await call('/mental-model', {
+    method: 'PATCH',
+    body: { bankId: bank, id: model.id, raw: { source_query: 'FROM-RAW.', trigger: { mode: 'full', bogus_field: 1 } } },
+  })
+  check('raw PATCH ok', viaRaw?.ok === true, viaRaw)
+  const raw = (await call(`/mental-model?bankId=${enc(bank)}&id=${enc(model.id)}`))?.model
+  check('raw 的 source_query 生效', raw?.source_query === 'FROM-RAW.', raw?.source_query)
+  check('raw 的 trigger.mode 生效', raw?.trigger?.mode === 'full', raw?.trigger?.mode)
+  check('未知 trigger 字段被丢弃', raw?.trigger?.bogus_field === undefined, raw?.trigger?.bogus_field)
+
   console.log('\n6) 面板路由：动作端点（用 clear，避免触发 LLM）')
   const cleared = await call('/mental-model-action', { method: 'POST', body: { bankId: bank, id: model.id, action: 'clear' } })
   check('clear ok', cleared?.ok === true, cleared)
