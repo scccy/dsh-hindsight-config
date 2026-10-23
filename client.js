@@ -143,6 +143,38 @@ window.__ModuleLoader__.load({
       mmAdvanced: '高级 JSON',
       mmBackToForm: '返回表单',
       mmJsonHint: '整份心智模型配置（name / source_query / max_tokens / tags / trigger）。trigger 里还有 mode、budget、fact_types、tags_match、exclude_mental_models、keep_trace、response_schema 等 17 个字段，表单只放了常用的，其余在这里改。',
+      mmFQuery: '这页问什么',
+      mmFMaxTokens: '回答长度上限',
+      mmFTags: '标签',
+      mmFTagsMatch: '标签匹配方式',
+      mmFCron: '定时刷新',
+      mmFFactTypes: '参与的记忆类型',
+      mmFNameHelp: '这一页在心智模型列表里显示的名字，可随时改。',
+      mmFQueryHelp: '每次刷新时，引擎带着这个问题去检索记忆、生成这页内容。它决定了这一页写什么。',
+      mmFMaxTokensHelp: '生成这页时最多用多少 token。越大越详细、越慢；留空用服务端默认。',
+      mmFTagsHelp: '给这页打标签，用于筛选与检索；多个用逗号分隔，例如 knowledge:decision。',
+      mmFModeHelp: 'full = 每次重新生成整页；delta = 只在原内容上做增量修改，更省更快。',
+      mmFBudgetHelp: '这次刷新最多检索多少记忆：低更省、高更全但也更慢。',
+      mmFTagsMatchHelp: '当这页带多个标签时，要命中全部标签、还是任一标签，才把它纳入检索。',
+      mmFAfterHelp: '开启后，每次记忆整合完成就自动刷新这页。它与下面的「定时刷新」互斥：开启会清掉 cron。',
+      mmFCronHelp: '按 UTC 时间的 5 段 cron 定时刷新，例如 17 * * * * 表示每小时第 17 分。服务端不接受 H。留空=不定时。',
+      mmFMinIntervalHelp: '两次自动刷新之间至少间隔多少秒，防止刷得太频繁；留空用服务端默认。',
+      mmFFactTypesHelp: '生成这页时用哪些类型的记忆，可多选：world=客观事实与背景，experience=做过的事与踩过的坑，observation=引擎总结的观察。',
+      mmInherit: '不设置（继承默认）',
+      mmModeFull: '整篇重写（full）',
+      mmModeDelta: '增量编辑（delta）',
+      mmBudgetLow: '低（更快、更省）',
+      mmBudgetMid: '中（默认）',
+      mmBudgetHigh: '高（更全、更慢）',
+      mmTagsMatchAll: '全部标签都要命中',
+      mmTagsMatchAny: '任一标签命中即可',
+      mmCronOff: '不定时',
+      mmCronHourly: '每小时',
+      mmCron6h: '每 6 小时',
+      mmCronDaily: '每天 3 点',
+      mmFactWorld: 'world（客观事实）',
+      mmFactExperience: 'experience（经验）',
+      mmFactObservation: 'observation（观测）',
       mmCronExclusive: '服务端把「整合后刷新」和「刷新 cron」视为互斥：开启前者会清掉 cron。',
       bankApplied: '已写入服务端',
       bankOverride: '已有覆盖',
@@ -286,6 +318,38 @@ window.__ModuleLoader__.load({
       mmAdvanced: 'Advanced JSON',
       mmBackToForm: 'Back to form',
       mmJsonHint: 'The whole mental-model config (name / source_query / max_tokens / tags / trigger). trigger carries 17 fields — mode, budget, fact_types, tags_match, exclude_mental_models, keep_trace, response_schema and more; the form shows the common ones, edit the rest here.',
+      mmFQuery: 'What this page asks',
+      mmFMaxTokens: 'Answer length limit',
+      mmFTags: 'Tags',
+      mmFTagsMatch: 'Tag matching',
+      mmFCron: 'Scheduled refresh',
+      mmFFactTypes: 'Memory types used',
+      mmFNameHelp: 'The name shown for this page in the mental-model list; safe to change anytime.',
+      mmFQueryHelp: 'On each refresh the engine searches memory with this question to build the page. It decides what this page says.',
+      mmFMaxTokensHelp: 'Maximum tokens used to build this page. Larger = more detail but slower; blank uses the server default.',
+      mmFTagsHelp: 'Tags for filtering and retrieval; comma-separated, e.g. knowledge:decision.',
+      mmFModeHelp: 'full = regenerate the whole page each time; delta = incremental edits on the existing content, cheaper and faster.',
+      mmFBudgetHelp: 'How much memory this refresh may search: low is cheaper, high is more thorough but slower.',
+      mmFTagsMatchHelp: 'With several tags on this page, require all of them or any one of them for it to be included.',
+      mmFAfterHelp: 'When on, this page refreshes after every consolidation. It is mutually exclusive with the scheduled cron below: turning it on clears the cron.',
+      mmFCronHelp: 'Refresh on a 5-field UTC cron, e.g. 17 * * * * means minute 17 of every hour. The server rejects H. Blank = no schedule.',
+      mmFMinIntervalHelp: 'Minimum seconds between two automatic refreshes, to avoid refreshing too often; blank uses the server default.',
+      mmFFactTypesHelp: 'Which memory types build this page, multi-select: world = objective facts/background, experience = what was done and learned, observation = engine observations.',
+      mmInherit: 'Not set (inherit default)',
+      mmModeFull: 'Rewrite whole page (full)',
+      mmModeDelta: 'Incremental edit (delta)',
+      mmBudgetLow: 'Low (faster, cheaper)',
+      mmBudgetMid: 'Medium (default)',
+      mmBudgetHigh: 'High (fuller, slower)',
+      mmTagsMatchAll: 'Require all tags',
+      mmTagsMatchAny: 'Any tag is enough',
+      mmCronOff: 'No schedule',
+      mmCronHourly: 'Hourly',
+      mmCron6h: 'Every 6 hours',
+      mmCronDaily: 'Daily 03:00',
+      mmFactWorld: 'world (facts)',
+      mmFactExperience: 'experience (lessons)',
+      mmFactObservation: 'observation (observations)',
       mmCronExclusive: 'The server treats "refresh after consolidation" and "refresh cron" as mutually exclusive: turning the former on clears the cron.',
       bankApplied: 'Written to server',
       bankOverride: 'overridden',
@@ -343,6 +407,9 @@ window.__ModuleLoader__.load({
 .dhc-area { min-height: 62px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .dhc-input:focus, .dhc-select:focus, .dhc-area:focus { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -1px; }
 .dhc-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dhc-check { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; cursor: pointer; user-select: none; }
+.dhc-check:hover { border-color: var(--dsw-alias-brand-primary); }
+.dhc-check input { accent-color: var(--dsw-alias-brand-primary); margin: 0; }
 .dhc-btn { appearance: none; font: inherit; cursor: pointer; border-radius: 7px; padding: 6px 12px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .dhc-btn:hover { border-color: var(--dsw-alias-brand-primary); }
 .dhc-btn[data-kind="primary"] { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: #fff; }
@@ -540,6 +607,21 @@ window.__ModuleLoader__.load({
             : null,
         ),
         h('div', { className: 'dhc-control' }, h(FieldControl, { t, field, text, onChange, disabled })),
+      )
+    }
+
+    function MmField({ t, labelKey, code, helpKey, children }) {
+      return h(
+        'div',
+        { className: 'dhc-row' },
+        h(
+          'div',
+          { className: 'dhc-label' },
+          h('span', null, t(labelKey)),
+          code ? h('code', null, code) : null,
+          helpKey ? h('div', { className: 'dhc-help' }, t(helpKey)) : null,
+        ),
+        h('div', { className: 'dhc-control' }, children),
       )
     }
 
@@ -785,7 +867,7 @@ window.__ModuleLoader__.load({
             return
           }
           setModelMsg(null)
-          setModelEdit({ id: model.id, name: model.name, isTaxonomy: model.isTaxonomy, loading: true, mode: 'form', sourceQuery: '', maxTokens: '', tags: '' })
+          setModelEdit({ id: model.id, name: model.name, isTaxonomy: model.isTaxonomy, loading: true, mode: 'form', sourceQuery: '', maxTokens: '', tags: '', refreshMode: '', budget: '', tagsMatch: '', refreshCron: '', minInterval: '', afterConsolidation: '', factTypes: [] })
           api(`/mental-model?bankId=${encodeURIComponent(bankId)}&id=${encodeURIComponent(model.id)}`)
             .then((data) => {
               if (!data.ok) {
@@ -810,7 +892,8 @@ window.__ModuleLoader__.load({
                 refreshCron: trigger.refresh_cron || '',
                 minInterval: asText(trigger.min_refresh_interval_seconds),
                 afterConsolidation: trigger.refresh_after_consolidation === undefined || trigger.refresh_after_consolidation === null ? '' : String(trigger.refresh_after_consolidation),
-                factTypes: Array.isArray(trigger.fact_types) ? trigger.fact_types.join(', ') : '',
+                tagsMatch: trigger.tags_match || '',
+                factTypes: Array.isArray(trigger.fact_types) ? [...trigger.fact_types] : [],
                 json: JSON.stringify(detail, null, 2),
               })
             })
@@ -1461,116 +1544,147 @@ window.__ModuleLoader__.load({
                                     'div',
                                     null,
                                     modelEdit.isTaxonomy
-                                      ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmTaxonomyWarn'))
-                                      : h('div', { className: 'dhc-muted', style: { fontSize: '11.5px' } }, t('mmOwnWarn')),
-                                    h('input', {
-                                      className: 'dhc-input',
-                                      type: 'text',
-                                      placeholder: t('mmName'),
-                                      style: { marginTop: '6px' },
-                                      value: modelEdit.name,
-                                      onChange: (event) => setModelEdit((current) => ({ ...current, name: event.target.value })),
-                                    }),
-                                    h('textarea', {
-                                      className: 'dhc-area',
-                                      rows: 3,
-                                      spellcheck: false,
-                                      placeholder: 'source_query',
-                                      style: { marginTop: '6px' },
-                                      value: modelEdit.sourceQuery,
-                                      onChange: (event) => setModelEdit((current) => ({ ...current, sourceQuery: event.target.value })),
-                                    }),
-                                    h(
-                                      'div',
-                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                      ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px', marginBottom: '6px' } }, t('mmTaxonomyWarn'))
+                                      : h('div', { className: 'dhc-muted', style: { fontSize: '11.5px', marginBottom: '6px' } }, t('mmOwnWarn')),
+                                    h(MmField, { t, labelKey: 'mmName', code: 'name', helpKey: 'mmFNameHelp' },
                                       h('input', {
                                         className: 'dhc-input',
-                                        type: 'number',
-                                        placeholder: 'max_tokens',
-                                        style: { flex: '0 0 120px' },
-                                        value: modelEdit.maxTokens,
-                                        onChange: (event) => setModelEdit((current) => ({ ...current, maxTokens: event.target.value })),
+                                        type: 'text',
+                                        value: modelEdit.name,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, name: event.target.value })),
                                       }),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmFQuery', code: 'source_query', helpKey: 'mmFQueryHelp' },
+                                      h('textarea', {
+                                        className: 'dhc-area',
+                                        rows: 4,
+                                        spellcheck: false,
+                                        value: modelEdit.sourceQuery,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, sourceQuery: event.target.value })),
+                                      }),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmFMaxTokens', code: 'max_tokens', helpKey: 'mmFMaxTokensHelp' },
+                                      h('div', { className: 'dhc-btns' },
+                                        h('input', {
+                                          className: 'dhc-input',
+                                          type: 'number',
+                                          min: '1',
+                                          style: { flex: '0 0 130px' },
+                                          value: modelEdit.maxTokens,
+                                          onChange: (event) => setModelEdit((current) => ({ ...current, maxTokens: event.target.value })),
+                                        }),
+                                        ...['1024', '2048', '4096', '8192'].map((preset) =>
+                                          h('button', {
+                                            key: preset,
+                                            className: 'dhc-btn',
+                                            type: 'button',
+                                            'data-kind': String(modelEdit.maxTokens) === preset ? 'primary' : undefined,
+                                            onClick: () => setModelEdit((current) => ({ ...current, maxTokens: preset })),
+                                          }, preset),
+                                        ),
+                                      ),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmFTags', code: 'tags', helpKey: 'mmFTagsHelp' },
                                       h('input', {
                                         className: 'dhc-input',
                                         type: 'text',
                                         spellcheck: false,
                                         placeholder: t('mmTagsPlaceholder'),
-                                        style: { flex: '1 1 200px' },
                                         value: modelEdit.tags,
                                         onChange: (event) => setModelEdit((current) => ({ ...current, tags: event.target.value })),
                                       }),
                                     ),
-                                    h(
-                                      'div',
-                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
-                                      h(
-                                        'select',
-                                        {
-                                          className: 'dhc-select',
-                                          style: { flex: '0 0 120px' },
-                                          value: modelEdit.refreshMode,
-                                          onChange: (event) => setModelEdit((current) => ({ ...current, refreshMode: event.target.value })),
-                                        },
-                                        h('option', { value: '' }, `${t('mmMode')}: —`),
-                                        h('option', { value: 'full' }, 'full'),
-                                        h('option', { value: 'delta' }, 'delta'),
+                                    h(MmField, { t, labelKey: 'mmMode', code: 'trigger.mode', helpKey: 'mmFModeHelp' },
+                                      h('select', {
+                                        className: 'dhc-select',
+                                        value: modelEdit.refreshMode,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, refreshMode: event.target.value })),
+                                      },
+                                        h('option', { value: '' }, t('mmInherit')),
+                                        h('option', { value: 'full' }, t('mmModeFull')),
+                                        h('option', { value: 'delta' }, t('mmModeDelta')),
                                       ),
-                                      h(
-                                        'select',
-                                        {
-                                          className: 'dhc-select',
-                                          style: { flex: '0 0 120px' },
-                                          value: modelEdit.budget,
-                                          onChange: (event) => setModelEdit((current) => ({ ...current, budget: event.target.value })),
-                                        },
-                                        h('option', { value: '' }, `${t('mmBudget')}: —`),
-                                        h('option', { value: 'low' }, 'low'),
-                                        h('option', { value: 'mid' }, 'mid'),
-                                        h('option', { value: 'high' }, 'high'),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmBudget', code: 'trigger.budget', helpKey: 'mmFBudgetHelp' },
+                                      h('select', {
+                                        className: 'dhc-select',
+                                        value: modelEdit.budget,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, budget: event.target.value })),
+                                      },
+                                        h('option', { value: '' }, t('mmInherit')),
+                                        h('option', { value: 'low' }, t('mmBudgetLow')),
+                                        h('option', { value: 'mid' }, t('mmBudgetMid')),
+                                        h('option', { value: 'high' }, t('mmBudgetHigh')),
                                       ),
-                                      h('input', {
-                                        className: 'dhc-input',
-                                        type: 'number',
-                                        placeholder: t('mmMinInterval'),
-                                        style: { flex: '0 0 150px' },
-                                        value: modelEdit.minInterval,
-                                        onChange: (event) => setModelEdit((current) => ({ ...current, minInterval: event.target.value })),
-                                      }),
-                                      h(
-                                        'select',
-                                        {
-                                          className: 'dhc-select',
-                                          style: { flex: '0 0 150px' },
-                                          value: modelEdit.afterConsolidation,
-                                          onChange: (event) => setModelEdit((current) => ({ ...current, afterConsolidation: event.target.value })),
-                                        },
-                                        h('option', { value: '' }, `${t('mmAfterConsolidation')}: —`),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmFTagsMatch', code: 'trigger.tags_match', helpKey: 'mmFTagsMatchHelp' },
+                                      h('select', {
+                                        className: 'dhc-select',
+                                        value: modelEdit.tagsMatch,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, tagsMatch: event.target.value })),
+                                      },
+                                        h('option', { value: '' }, t('mmInherit')),
+                                        h('option', { value: 'all' }, t('mmTagsMatchAll')),
+                                        h('option', { value: 'any' }, t('mmTagsMatchAny')),
+                                      ),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmAfterConsolidation', code: 'trigger.refresh_after_consolidation', helpKey: 'mmFAfterHelp' },
+                                      h('select', {
+                                        className: 'dhc-select',
+                                        value: modelEdit.afterConsolidation,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, afterConsolidation: event.target.value })),
+                                      },
+                                        h('option', { value: '' }, t('mmInherit')),
                                         h('option', { value: 'true' }, t('on')),
                                         h('option', { value: 'false' }, t('off')),
                                       ),
                                     ),
-                                    h(
-                                      'div',
-                                      { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                    h(MmField, { t, labelKey: 'mmFCron', code: 'trigger.refresh_cron', helpKey: 'mmFCronHelp' },
+                                      h('div', { className: 'dhc-btns' },
+                                        h('input', {
+                                          className: 'dhc-input',
+                                          type: 'text',
+                                          spellcheck: false,
+                                          placeholder: t('mmCronPlaceholder'),
+                                          style: { flex: '1 1 200px' },
+                                          value: modelEdit.refreshCron,
+                                          onChange: (event) => setModelEdit((current) => ({ ...current, refreshCron: event.target.value })),
+                                        }),
+                                        h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit((current) => ({ ...current, refreshCron: '' })) }, t('mmCronOff')),
+                                        h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit((current) => ({ ...current, refreshCron: '17 * * * *' })) }, t('mmCronHourly')),
+                                        h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit((current) => ({ ...current, refreshCron: '17 */6 * * *' })) }, t('mmCron6h')),
+                                        h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit((current) => ({ ...current, refreshCron: '17 3 * * *' })) }, t('mmCronDaily')),
+                                      ),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmMinInterval', code: 'trigger.min_refresh_interval_seconds', helpKey: 'mmFMinIntervalHelp' },
                                       h('input', {
                                         className: 'dhc-input',
-                                        type: 'text',
-                                        spellcheck: false,
-                                        placeholder: t('mmCronPlaceholder'),
-                                        style: { flex: '1 1 180px' },
-                                        value: modelEdit.refreshCron,
-                                        onChange: (event) => setModelEdit((current) => ({ ...current, refreshCron: event.target.value })),
+                                        type: 'number',
+                                        min: '0',
+                                        style: { maxWidth: '180px' },
+                                        value: modelEdit.minInterval,
+                                        onChange: (event) => setModelEdit((current) => ({ ...current, minInterval: event.target.value })),
                                       }),
-                                      h('input', {
-                                        className: 'dhc-input',
-                                        type: 'text',
-                                        spellcheck: false,
-                                        placeholder: t('mmFactTypesPlaceholder'),
-                                        style: { flex: '1 1 180px' },
-                                        value: modelEdit.factTypes,
-                                        onChange: (event) => setModelEdit((current) => ({ ...current, factTypes: event.target.value })),
-                                      }),
+                                    ),
+                                    h(MmField, { t, labelKey: 'mmFFactTypes', code: 'trigger.fact_types', helpKey: 'mmFFactTypesHelp' },
+                                      h('div', { className: 'dhc-btns' },
+                                        ...['world', 'experience', 'observation'].map((fact) =>
+                                          h('label', { key: fact, className: 'dhc-check' },
+                                            h('input', {
+                                              type: 'checkbox',
+                                              checked: (modelEdit.factTypes || []).includes(fact),
+                                              onChange: (event) => setModelEdit((current) => {
+                                                const list = Array.isArray(current.factTypes) ? [...current.factTypes] : []
+                                                const at = list.indexOf(fact)
+                                                if (event.target.checked && at === -1) list.push(fact)
+                                                if (!event.target.checked && at !== -1) list.splice(at, 1)
+                                                return { ...current, factTypes: list }
+                                              }),
+                                            }),
+                                            h('span', null, t(fact === 'world' ? 'mmFactWorld' : fact === 'experience' ? 'mmFactExperience' : 'mmFactObservation')),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                     modelEdit.afterConsolidation === 'true' && modelEdit.refreshCron.trim()
                                       ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmCronExclusive'))
@@ -1589,11 +1703,12 @@ window.__ModuleLoader__.load({
                                             const trigger = {}
                                             if (modelEdit.refreshMode) trigger.mode = modelEdit.refreshMode
                                             if (modelEdit.budget) trigger.budget = modelEdit.budget
+                                            if (modelEdit.tagsMatch) trigger.tags_match = modelEdit.tagsMatch
                                             if (modelEdit.refreshCron) trigger.refresh_cron = modelEdit.refreshCron
                                             if (modelEdit.minInterval !== '') trigger.min_refresh_interval_seconds = Number(modelEdit.minInterval)
                                             if (modelEdit.afterConsolidation !== '') trigger.refresh_after_consolidation = modelEdit.afterConsolidation === 'true'
-                                            if (modelEdit.factTypes.trim()) {
-                                              trigger.fact_types = modelEdit.factTypes.split(',').map((part) => part.trim()).filter(Boolean)
+                                            if (Array.isArray(modelEdit.factTypes) && modelEdit.factTypes.length) {
+                                              trigger.fact_types = modelEdit.factTypes
                                             }
                                             modelAction(
                                               'PATCH',
@@ -1632,10 +1747,11 @@ window.__ModuleLoader__.load({
                                                   trigger: {
                                                     mode: current.refreshMode || undefined,
                                                     budget: current.budget || undefined,
+                                                    tags_match: current.tagsMatch || undefined,
                                                     refresh_cron: current.refreshCron || undefined,
                                                     min_refresh_interval_seconds: current.minInterval === '' ? undefined : Number(current.minInterval),
                                                     refresh_after_consolidation: current.afterConsolidation === '' ? undefined : current.afterConsolidation === 'true',
-                                                    fact_types: current.factTypes.trim() ? current.factTypes.split(',').map((p) => p.trim()).filter(Boolean) : undefined,
+                                                    fact_types: Array.isArray(current.factTypes) && current.factTypes.length ? current.factTypes : undefined,
                                                   },
                                                 },
                                                 null,
