@@ -115,6 +115,8 @@ try {
   check('有一个心智模型', Boolean(model), listed?.models)
   check('被标记为内置页', model?.isTaxonomy === true, model)
   check('返回 taxonomy 清单', (listed?.taxonomy || []).length === 5, listed?.taxonomy)
+  check('refreshing 是布尔值', typeof listed?.refreshing === 'boolean', listed?.refreshing)
+  check('新建页没有失败标记（failedRecently=false）', model?.failedRecently === false, model?.failedRecently)
 
   console.log('\n3) 面板路由：改内置页 source_query → 服务端 + 客户端配置都要变')
   const patched = await call('/mental-model', { method: 'PATCH', body: { bankId: bank, id: model.id, sourceQuery: 'REWRITTEN-BY-PANEL.' } })

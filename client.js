@@ -120,6 +120,7 @@ window.__ModuleLoader__.load({
       mmTaxonomy: '内置页',
       mmStale: '待刷新',
       mmFailed: '刷新失败',
+      mmRefreshing: '刷新中…',
       mmLastRefreshed: '上次刷新',
       mmLastFailed: '上次失败',
       mmRefresh: '刷新',
@@ -251,6 +252,7 @@ window.__ModuleLoader__.load({
       mmTaxonomy: 'seeded',
       mmStale: 'stale',
       mmFailed: 'refresh failed',
+      mmRefreshing: 'refreshing…',
       mmLastRefreshed: 'last refreshed',
       mmLastFailed: 'last failed',
       mmRefresh: 'Refresh',
@@ -721,7 +723,7 @@ window.__ModuleLoader__.load({
               setModels({ status: 'done', items: [], taxonomy: [], error: data.error })
               return
             }
-            setModels({ status: 'done', items: data.models || [], taxonomy: data.taxonomy || [] })
+            setModels({ status: 'done', items: data.models || [], taxonomy: data.taxonomy || [], refreshing: Boolean(data.refreshing) })
           })
           .catch((error) => setModels({ status: 'done', items: [], taxonomy: [], error: { message: String(error.message || error) } }))
       }, [])
@@ -1305,6 +1307,7 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'dhc-btns' },
+                    models.refreshing ? h(Badge, { tone: 'warn' }, t('mmRefreshing')) : null,
                     models.status === 'loading' ? h(Spinner) : null,
                     h('button', { className: 'dhc-btn', type: 'button', onClick: () => loadModels(bankId) }, t('refresh')),
                   ),
@@ -1332,7 +1335,7 @@ window.__ModuleLoader__.load({
                           h('span', { className: 'dhc-mono' }, model.name),
                           model.isTaxonomy ? h(Badge, null, t('mmTaxonomy')) : null,
                           model.isStale ? h(Badge, { tone: 'warn' }, t('mmStale')) : null,
-                          model.lastRefreshFailedAt ? h(Badge, { tone: 'bad' }, t('mmFailed')) : null,
+                          model.failedRecently ? h(Badge, { tone: 'bad' }, t('mmFailed')) : null,
                         ),
                         h(
                           'span',

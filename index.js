@@ -678,20 +678,37 @@ export function apply(ctx) {
       if (!bankId) return json(res, 400, { ok: false, error: '缺少 bankId' })
       const result = await upstream(file.raw, `/v1/default/banks/${encodeURIComponent(bankId)}/mental-models`)
       if (!result.ok) return json(res, 200, { ok: false, error: result })
+      // Is a refresh running right now? The model row cannot tell on its own, and
+      // without this the UI looks frozen for the minutes a synthesis takes.
+      let refreshing = false
+      const ops = await upstream(file.raw, `/v1/default/banks/${encodeURIComponent(bankId)}/operations?limit=20`)
+      if (ops.ok) {
+        const items = ops.data?.items ?? ops.data?.operations ?? []
+        refreshing = items.some(
+          (op) => op.operation_type === 'refresh_mental_model' && op.status !== 'completed' && op.status !== 'failed' && op.status !== 'cancelled',
+        )
+      }
       const taxonomy = taxonomyList()
-      const items = (result.data?.items ?? []).map((model) => ({
-        id: model.id,
-        name: model.name,
-        tags: model.tags,
-        sourceQuery: model.source_query,
-        maxTokens: model.max_tokens,
-        trigger: model.trigger,
-        lastRefreshedAt: model.last_refreshed_at,
-        lastRefreshFailedAt: model.last_refresh_failed_at,
-        isStale: model.is_stale,
-        isTaxonomy: Boolean(taxonomyName(model.name)),
-      }))
-      json(res, 200, { ok: true, bankId, models: items, taxonomy })
+      const items = (result.data?.items ?? []).map((model) => {
+        // `last_refresh_failed_at` is sticky: it survives a later success, so the
+        // badge must compare the two instants rather than test for presence.
+        const failedAt = model.last_refresh_failed_at ? Date.parse(model.last_refresh_failed_at) : 0
+        const refreshedAt = model.last_refreshed_at ? Date.parse(model.last_refreshed_at) : 0
+        return {
+          id: model.id,
+          name: model.name,
+          tags: model.tags,
+          sourceQuery: model.source_query,
+          maxTokens: model.max_tokens,
+          trigger: model.trigger,
+          lastRefreshedAt: model.last_refreshed_at,
+          lastRefreshFailedAt: model.last_refresh_failed_at,
+          failedRecently: failedAt > refreshedAt,
+          isStale: model.is_stale,
+          isTaxonomy: Boolean(taxonomyName(model.name)),
+        }
+      })
+      json(res, 200, { ok: true, bankId, models: items, taxonomy, refreshing })
     })
 
     route('/mental-model', async (req, res) => {
