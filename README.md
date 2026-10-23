@@ -9,6 +9,12 @@ Hindsight 记忆（`@vectorize-io/hindsight-coding-agents`）的 **伞包 + 可�
 
 安装本包 = 上面两半一起到位。卸载本包 = 两半一起消失。
 
+## 截图
+
+| 状态页 | 客户端配置 |
+| --- | --- |
+| ![状态页](assets/screenshot-status.png) | ![客户端配置](assets/screenshot-client-settings.png) |
+
 ---
 
 ## 安装
