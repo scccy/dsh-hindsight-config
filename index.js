@@ -585,6 +585,53 @@ export function apply(ctx) {
       json(res, 200, { ok: true, bankId, updated: Object.keys(updates), response: result.data })
     })
 
+    // Bank aliases: extra ids that also reach one bank. This is what makes a
+    // directory rename non-destructive — add the new name as an alias first,
+    // and sessions resolving to it keep writing the same bank.
+    route('/aliases', async (req, res) => {
+      const file = await readConfigFile()
+      const url = new URL(req.url || '/', 'http://localhost')
+      // GET/DELETE carry the bank in the query; POST/PATCH carry it in the body.
+      const body = req.method === 'POST' || req.method === 'PATCH' ? await readBody(req) : {}
+      const bankId = String(body.bankId || url.searchParams.get('bankId') || '')
+      if (!bankId) return json(res, 400, { ok: false, error: '缺少 bankId' })
+      const bankPath = `/v1/default/banks/${encodeURIComponent(bankId)}/aliases`
+
+      if (req.method === 'GET') {
+        const result = await upstream(file.raw, bankPath)
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, bankId, aliases: result.data?.aliases ?? [] })
+      }
+      if (req.method === 'POST') {
+        const alias = String(body.alias || '').trim()
+        if (!alias) return json(res, 400, { ok: false, error: '别名不能为空' })
+        const result = await upstream(file.raw, bankPath, {
+          method: 'POST',
+          body: { alias, primary: Boolean(body.primary) },
+        })
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, bankId, alias })
+      }
+      if (req.method === 'PATCH') {
+        const alias = String(body.alias || '').trim()
+        if (!alias) return json(res, 400, { ok: false, error: '缺少 alias' })
+        const result = await upstream(file.raw, `${bankPath}/${encodeURIComponent(alias)}`, {
+          method: 'PATCH',
+          body: { primary: Boolean(body.primary) },
+        })
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, bankId, alias, primary: Boolean(body.primary) })
+      }
+      if (req.method === 'DELETE') {
+        const alias = url.searchParams.get('alias') || ''
+        if (!alias) return json(res, 400, { ok: false, error: '缺少 alias' })
+        const result = await upstream(file.raw, `${bankPath}/${encodeURIComponent(alias)}`, { method: 'DELETE' })
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, bankId, alias, removed: true })
+      }
+      return json(res, 405, { ok: false, error: '仅支持 GET / POST / PATCH / DELETE' })
+    })
+
     route('/logs', async (req, res) => {
       const url = new URL(req.url || '/', 'http://localhost')
       const file = url.searchParams.get('file') || 'plugin'

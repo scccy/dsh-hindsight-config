@@ -106,6 +106,14 @@ window.__ModuleLoader__.load({
       bankConfig: 'Bank 配置（服务端）',
       bankConfigHint: '这些值写在服务端该 bank 的配置里，立即对后续写入/召回生效。只提交你改动的字段。',
       bankApply: '写入服务端',
+      aliasTitle: 'Bank 别名',
+      aliasHint: '别名是"另一个也能到达这个 bank 的 id"。改目录名时最有用：先给旧 bank 加新目录名作别名，再改目录，新会话就还是写进同一个 bank（记忆不丢、不冷启动）。别名不能已经是某个 bank 或另一个别名。',
+      aliasNone: '还没有别名',
+      aliasPlaceholder: 'coding-agent::新目录名',
+      aliasAdd: '添加别名',
+      aliasPrimary: '显示名',
+      aliasMakePrimary: '设为显示名',
+      aliasRemove: '删除',
       bankApplied: '已写入服务端',
       bankOverride: '已有覆盖',
       advanced: '高级对象',
@@ -211,6 +219,14 @@ window.__ModuleLoader__.load({
       bankConfig: 'Bank configuration (server side)',
       bankConfigHint: 'These live in the bank config on the server and affect the next writes and recalls. Only changed fields are submitted.',
       bankApply: 'Write to server',
+      aliasTitle: 'Bank aliases',
+      aliasHint: 'An alias is another id that also reaches this bank. Most useful when renaming a directory: add the new directory name as an alias first, then rename the folder — new sessions still write to this bank (no lost memory, no cold start). An alias must not already name a bank or another alias.',
+      aliasNone: 'No aliases yet',
+      aliasPlaceholder: 'coding-agent::new-directory-name',
+      aliasAdd: 'Add alias',
+      aliasPrimary: 'shown as',
+      aliasMakePrimary: 'Show as this name',
+      aliasRemove: 'Remove',
       bankApplied: 'Written to server',
       bankOverride: 'overridden',
       advanced: 'Advanced objects',
@@ -493,6 +509,10 @@ window.__ModuleLoader__.load({
       const [bankDetail, setBankDetail] = useState({ status: 'idle' })
       const [bankDraft, setBankDraft] = useState({})
       const [bankSave, setBankSave] = useState({ status: 'idle' })
+      const [aliases, setAliases] = useState({ status: 'idle', items: [] })
+      const [aliasDraft, setAliasDraft] = useState('')
+      const [aliasBusy, setAliasBusy] = useState(false)
+      const [aliasMsg, setAliasMsg] = useState(null)
       const [logFile, setLogFile] = useState('plugin')
       const [logState, setLogState] = useState({ status: 'idle' })
 
@@ -652,9 +672,47 @@ window.__ModuleLoader__.load({
           .catch((error) => setBankDetail({ status: 'done', data: { ok: false, error: { message: String(error.message || error) } } }))
       }, [])
 
+      const loadAliases = useCallback((id) => {
+        if (!id) return
+        setAliases({ status: 'loading', items: [] })
+        api(`/aliases?bankId=${encodeURIComponent(id)}`)
+          .then((data) => {
+            if (!data.ok) {
+              setAliases({ status: 'done', items: [], error: data.error })
+              return
+            }
+            setAliases({ status: 'done', items: data.aliases || [] })
+          })
+          .catch((error) => setAliases({ status: 'done', items: [], error: { message: String(error.message || error) } }))
+      }, [])
+
       useEffect(() => {
         if (tab === 'server' && bankId) loadBank(bankId)
       }, [tab, bankId, loadBank])
+
+      useEffect(() => {
+        if (tab === 'server' && bankId) loadAliases(bankId)
+      }, [tab, bankId, loadAliases])
+
+      const aliasAction = useCallback(
+        (method, payload, done) => {
+          setAliasBusy(true)
+          setAliasMsg(null)
+          const query = method === 'DELETE' ? `?bankId=${encodeURIComponent(bankId)}&alias=${encodeURIComponent(payload.alias)}` : ''
+          api(`/aliases${query}`, { method, body: method === 'DELETE' ? undefined : { bankId, ...payload } })
+            .then((data) => {
+              if (!data.ok) {
+                setAliasMsg({ tone: 'bad', text: (data.error && (data.error.detail || data.error.message)) || '服务端拒绝了这次操作' })
+                return
+              }
+              if (done) done()
+              loadAliases(bankId)
+            })
+            .catch((error) => setAliasMsg({ tone: 'bad', text: String(error.message || error) }))
+            .finally(() => setAliasBusy(false))
+        },
+        [bankId, loadAliases],
+      )
 
       const loadLogs = useCallback(() => {
         setLogState({ status: 'loading' })
@@ -1116,6 +1174,94 @@ window.__ModuleLoader__.load({
             : bankDetail.status === 'loading'
               ? h('div', { className: 'dhc-card dhc-muted' }, h(Spinner), ' ', t('bankLoad'))
               : null,
+          detail?.ok
+            ? h(
+                'div',
+                { className: 'dhc-card' },
+                h(
+                  'div',
+                  { className: 'dhc-card-head' },
+                  h('div', { className: 'dhc-card-title' }, t('aliasTitle')),
+                  aliases.status === 'loading' ? h(Spinner) : null,
+                ),
+                h('div', { className: 'dhc-group-hint' }, t('aliasHint')),
+                aliases.status === 'done' && aliases.error
+                  ? h('div', { className: 'dhc-err' }, `${t('errorPrefix')}${aliases.error.detail || aliases.error.message || ''}`)
+                  : null,
+                aliases.status === 'done' && !aliases.error && !(aliases.items || []).length
+                  ? h('div', { className: 'dhc-muted', style: { marginBottom: '8px' } }, t('aliasNone'))
+                  : null,
+                h(
+                  'div',
+                  { className: 'dhc-list', style: { marginBottom: '8px' } },
+                  (aliases.items || []).map((entry) =>
+                    h(
+                      'div',
+                      { className: 'dhc-bankrow', key: entry.alias, style: { cursor: 'default' } },
+                      h('span', { className: 'dhc-mono' }, entry.alias),
+                      h(
+                        'span',
+                        { className: 'dhc-btns' },
+                        entry.primary ? h(Badge, { tone: 'ok' }, t('aliasPrimary')) : null,
+                        entry.primary
+                          ? null
+                          : h(
+                              'button',
+                              {
+                                className: 'dhc-btn',
+                                type: 'button',
+                                disabled: aliasBusy,
+                                onClick: () => aliasAction('PATCH', { alias: entry.alias, primary: true }),
+                              },
+                              t('aliasMakePrimary'),
+                            ),
+                        h(
+                          'button',
+                          {
+                            className: 'dhc-btn',
+                            type: 'button',
+                            'data-kind': 'danger',
+                            disabled: aliasBusy,
+                            onClick: () => aliasAction('DELETE', { alias: entry.alias }),
+                          },
+                          t('aliasRemove'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                h(
+                  'div',
+                  { className: 'dhc-btns' },
+                  h('input', {
+                    className: 'dhc-input',
+                    type: 'text',
+                    spellcheck: false,
+                    placeholder: t('aliasPlaceholder'),
+                    value: aliasDraft,
+                    style: { flex: '1 1 240px' },
+                    onChange: (event) => setAliasDraft(event.target.value),
+                    onKeyDown: (event) => {
+                      if (event.key === 'Enter' && aliasDraft.trim() && !aliasBusy) {
+                        aliasAction('POST', { alias: aliasDraft.trim(), primary: false }, () => setAliasDraft(''))
+                      }
+                    },
+                  }),
+                  h(
+                    'button',
+                    {
+                      className: 'dhc-btn',
+                      type: 'button',
+                      'data-kind': 'primary',
+                      disabled: aliasBusy || !aliasDraft.trim(),
+                      onClick: () => aliasAction('POST', { alias: aliasDraft.trim(), primary: false }, () => setAliasDraft('')),
+                    },
+                    t('aliasAdd'),
+                  ),
+                ),
+                aliasMsg ? h('div', { className: aliasMsg.tone === 'ok' ? 'dhc-ok' : 'dhc-err', style: { marginTop: '6px' } }, aliasMsg.text) : null,
+              )
+            : null,
           detail?.ok
             ? h(
                 'div',
