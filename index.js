@@ -805,7 +805,9 @@ export function apply(ctx) {
       const result = await upstream(
         file.raw,
         `/v1/default/banks/${encodeURIComponent(bankId)}/mental-models/${encodeURIComponent(id)}/${suffix}`,
-        { method: 'POST', timeoutMs: action === 'refresh' ? 120000 : 60000 },
+        // A dry run costs the same LLM tokens as a real refresh, so give it the
+        // same generous budget; the engine's reflect call can take minutes.
+        { method: 'POST', timeoutMs: action === 'refresh' || action === 'dry-run' ? 240000 : 60000 },
       )
       if (!result.ok) return json(res, 200, { ok: false, error: result })
       json(res, 200, { ok: true, action, result: result.data })

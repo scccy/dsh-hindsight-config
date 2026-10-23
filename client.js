@@ -175,6 +175,32 @@ window.__ModuleLoader__.load({
       mmFactWorld: 'world（客观事实）',
       mmFactExperience: 'experience（经验）',
       mmFactObservation: 'observation（观测）',
+      mmPreviewTitle: '刷新预览（未写入）',
+      mmPreviewRunning: '正在预览…（会消耗一次 LLM，可能要几十秒）',
+      mmPreviewClose: '关闭',
+      mmPreviewMode: '模式',
+      mmPreviewOutcome: '结果',
+      mmPreviewWouldPersist: '真实刷新会写入',
+      mmPreviewYes: '会',
+      mmPreviewNo: '不会',
+      mmPreviewFacts: '事实（检索 / 使用）',
+      mmPreviewScope: '读取范围',
+      mmPreviewWindow: '时间窗口',
+      mmPreviewWarnings: '提示',
+      mmPreviewDiff: '变更预览（diff）',
+      mmPreviewNoDiff: '与当前内容一致，没有变化。',
+      mmPreviewError: '预览失败',
+      mmPreviewDuration: '耗时',
+      mmFallbackNoBaseline: '没有基线内容，改为整篇重写',
+      mmFallbackSourceQueryChanged: '问法变了，改为整篇重写',
+      mmFallbackStructuredUnreadable: '结构化文档读不出，改为整篇重写',
+      mmFallbackDeltaFailed: '增量操作失败，改为整篇重写',
+      mmFallbackDeltaSkipped: '增量操作全被跳过，改为整篇重写',
+      mmOutcomeWritten: '会写入新内容',
+      mmOutcomeUnchanged: '内容没有变化',
+      mmOutcomePreserved: '没有新事实，保留原内容',
+      mmOutcomeFailedEmpty: '生成失败（空内容），不会写入',
+      mmOutcomeFailedDelta: '增量未应用，刷新失败',
       mmCronExclusive: '服务端把「整合后刷新」和「刷新 cron」视为互斥：开启前者会清掉 cron。',
       bankApplied: '已写入服务端',
       bankOverride: '已有覆盖',
@@ -350,6 +376,32 @@ window.__ModuleLoader__.load({
       mmFactWorld: 'world (facts)',
       mmFactExperience: 'experience (lessons)',
       mmFactObservation: 'observation (observations)',
+      mmPreviewTitle: 'Refresh preview (nothing written)',
+      mmPreviewRunning: 'Previewing… (uses one LLM call; may take a while)',
+      mmPreviewClose: 'Close',
+      mmPreviewMode: 'Mode',
+      mmPreviewOutcome: 'Outcome',
+      mmPreviewWouldPersist: 'A real refresh would write',
+      mmPreviewYes: 'yes',
+      mmPreviewNo: 'no',
+      mmPreviewFacts: 'Facts (retrieved / used)',
+      mmPreviewScope: 'Scope',
+      mmPreviewWindow: 'Window',
+      mmPreviewWarnings: 'Warnings',
+      mmPreviewDiff: 'Diff preview',
+      mmPreviewNoDiff: 'Identical to current content — no changes.',
+      mmPreviewError: 'Preview failed',
+      mmPreviewDuration: 'Duration',
+      mmFallbackNoBaseline: 'no baseline content — ran as a full rewrite',
+      mmFallbackSourceQueryChanged: 'source query changed — ran as a full rewrite',
+      mmFallbackStructuredUnreadable: 'structured document unreadable — ran as a full rewrite',
+      mmFallbackDeltaFailed: 'delta operations failed — ran as a full rewrite',
+      mmFallbackDeltaSkipped: 'all delta operations skipped — ran as a full rewrite',
+      mmOutcomeWritten: 'would write new content',
+      mmOutcomeUnchanged: 'no change',
+      mmOutcomePreserved: 'no new facts — keeps current content',
+      mmOutcomeFailedEmpty: 'generation failed (empty) — nothing written',
+      mmOutcomeFailedDelta: 'delta not applied — refresh failed',
       mmCronExclusive: 'The server treats "refresh after consolidation" and "refresh cron" as mutually exclusive: turning the former on clears the cron.',
       bankApplied: 'Written to server',
       bankOverride: 'overridden',
@@ -435,6 +487,9 @@ window.__ModuleLoader__.load({
 .dhc-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
 .dhc-spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--dsw-alias-border-l2); border-top-color: var(--dsw-alias-brand-primary); animation: dhc-spin 0.8s linear infinite; }
 @keyframes dhc-spin { to { transform: rotate(360deg); } }
+.dhc-modal { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 18, 24, 0.45); }
+.dhc-modal-panel { width: 100%; max-width: 880px; max-height: 86vh; overflow: auto; background: var(--dsw-alias-bg-layer-1); border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; padding: 16px 18px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28); }
+.dhc-modal-panel .dhc-card-head { position: sticky; top: -16px; background: var(--dsw-alias-bg-layer-1); padding-top: 4px; z-index: 1; }
 .dhc-list { display: flex; flex-direction: column; gap: 6px; }
 .dhc-bankrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; cursor: pointer; background: none; color: inherit; font: inherit; text-align: left; }
 .dhc-bankrow[data-active="true"] { border-color: var(--dsw-alias-brand-primary); }
@@ -655,6 +710,85 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function ModelPreviewModal({ t, preview, onClose }) {
+      if (!preview) return null
+      const fallbackText = (reason) => {
+        const map = {
+          no_baseline_content: 'mmFallbackNoBaseline',
+          source_query_changed: 'mmFallbackSourceQueryChanged',
+          structured_doc_unreadable: 'mmFallbackStructuredUnreadable',
+          delta_ops_failed: 'mmFallbackDeltaFailed',
+          delta_ops_all_skipped: 'mmFallbackDeltaSkipped',
+        }
+        return map[reason] ? t(map[reason]) : reason
+      }
+      const modeText = (mode) => (mode === 'full' ? t('mmModeFull') : mode === 'delta' ? t('mmModeDelta') : mode)
+      const outcomeText = (outcome) => {
+        const map = {
+          content_written: 'mmOutcomeWritten',
+          content_unchanged: 'mmOutcomeUnchanged',
+          content_preserved_no_new_facts: 'mmOutcomePreserved',
+          refresh_failed_empty_candidate: 'mmOutcomeFailedEmpty',
+          refresh_failed_delta_not_applied: 'mmOutcomeFailedDelta',
+        }
+        return map[outcome] ? t(map[outcome]) : outcome
+      }
+      const data = preview.data || {}
+      const retrieved = data.facts?.retrieved || {}
+      const used = data.facts?.used || {}
+      const factTypes = [...new Set([...Object.keys(retrieved), ...Object.keys(used)])]
+      return h(
+        'div',
+        {
+          className: 'dhc-modal',
+          onClick: (event) => {
+            if (event.target === event.currentTarget) onClose()
+          },
+        },
+        h(
+          'div',
+          { className: 'dhc-modal-panel', role: 'dialog', 'aria-modal': 'true' },
+          h(
+            'div',
+            { className: 'dhc-card-head' },
+            h('div', { className: 'dhc-card-title' }, `${t('mmPreviewTitle')}${preview.name ? ` · ${preview.name}` : ''}`),
+            h('button', { className: 'dhc-btn', type: 'button', onClick: onClose }, t('mmPreviewClose')),
+          ),
+          preview.status === 'loading'
+            ? h('div', { className: 'dhc-muted', style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h(Spinner), ' ', t('mmPreviewRunning'))
+            : preview.status === 'error'
+              ? h('div', { className: 'dhc-err' }, `${t('mmPreviewError')}：${preview.error}`)
+              : h(
+                  'div',
+                  { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                  h(
+                    'dl',
+                    { className: 'dhc-kv' },
+                    h('dt', null, t('mmPreviewMode')),
+                    h('dd', null, `${modeText(data.requested_mode)} → ${modeText(data.effective_mode)}${data.mode_fallback_reason ? `（${fallbackText(data.mode_fallback_reason)}）` : ''}`),
+                    h('dt', null, t('mmPreviewOutcome')),
+                    h('dd', null, outcomeText(data.outcome)),
+                    h('dt', null, t('mmPreviewWouldPersist')),
+                    h('dd', null, data.would_persist ? t('mmPreviewYes') : t('mmPreviewNo')),
+                    factTypes.length ? h('dt', null, t('mmPreviewFacts')) : null,
+                    factTypes.length
+                      ? h('dd', { className: 'dhc-mono' }, factTypes.map((key) => `${key}: ${retrieved[key] ?? 0} / ${used[key] ?? 0}`).join('   '))
+                      : null,
+                    data.scope ? h('dt', null, t('mmPreviewScope')) : null,
+                    data.scope ? h('dd', { className: 'dhc-mono', style: { fontSize: '11px' } }, JSON.stringify(data.scope)) : null,
+                    data.window ? h('dt', null, t('mmPreviewWindow')) : null,
+                    data.window ? h('dd', { className: 'dhc-mono', style: { fontSize: '11px' } }, JSON.stringify(data.window)) : null,
+                    typeof data.duration_ms === 'number' ? h('dt', null, t('mmPreviewDuration')) : null,
+                    typeof data.duration_ms === 'number' ? h('dd', null, `${Math.round(data.duration_ms / 1000)}s`) : null,
+                  ),
+                  (data.warnings || []).length ? h('div', { className: 'dhc-warn' }, `${t('mmPreviewWarnings')}：${data.warnings.join('；')}`) : null,
+                  h('div', { className: 'dhc-group-title', style: { marginTop: '4px' } }, t('mmPreviewDiff')),
+                  data.diff ? h('pre', { className: 'dhc-pre' }, data.diff) : h('div', { className: 'dhc-muted' }, t('mmPreviewNoDiff')),
+                ),
+        ),
+      )
+    }
+
     /* ---------------------------------------------------------------- the panel */
 
     function Panel({ t }) {
@@ -689,6 +823,7 @@ window.__ModuleLoader__.load({
       const [modelEdit, setModelEdit] = useState(null)
       const [modelBusy, setModelBusy] = useState(false)
       const [modelMsg, setModelMsg] = useState(null)
+      const [modelPreview, setModelPreview] = useState(null)
       const [logFile, setLogFile] = useState('plugin')
       const [logState, setLogState] = useState({ status: 'idle' })
 
@@ -864,14 +999,23 @@ window.__ModuleLoader__.load({
 
       const modelAction = useCallback(
         (method, payload, done) => {
+          const isDryRun = Boolean(payload && payload.action === 'dry-run')
           setModelBusy(true)
           setModelMsg(null)
+          if (isDryRun) setModelPreview({ status: 'loading', modelId: payload.id, name: payload.name || '' })
           const path = method === 'PATCH' || method === 'DELETE' ? '/mental-model' : '/mental-model-action'
           const query = method === 'DELETE' ? `?bankId=${encodeURIComponent(bankId)}&id=${encodeURIComponent(payload.id)}` : ''
           api(`${path}${query}`, { method, body: method === 'DELETE' ? undefined : { bankId, ...payload } })
             .then((data) => {
               if (!data.ok) {
-                setModelMsg({ tone: 'bad', text: (data.error && (data.error.detail || data.error.message || data.error.error)) || '服务端拒绝了这次操作' })
+                const message = (data.error && (data.error.detail || data.error.message || data.error.error)) || '服务端拒绝了这次操作'
+                if (isDryRun) setModelPreview({ status: 'error', modelId: payload.id, name: payload.name || '', error: message })
+                else setModelMsg({ tone: 'bad', text: message })
+                return
+              }
+              if (isDryRun) {
+                // A dry run writes nothing; show the preview instead of reloading.
+                setModelPreview({ status: 'done', modelId: payload.id, name: payload.name || '', data: data.result })
                 return
               }
               if (data.configWrite && data.configWrite.written) {
@@ -882,7 +1026,11 @@ window.__ModuleLoader__.load({
               if (done) done()
               loadModels(bankId)
             })
-            .catch((error) => setModelMsg({ tone: 'bad', text: String(error.message || error) }))
+            .catch((error) => {
+              const message = String(error.message || error)
+              if (isDryRun) setModelPreview({ status: 'error', modelId: payload.id, name: payload.name || '', error: message })
+              else setModelMsg({ tone: 'bad', text: message })
+            })
             .finally(() => setModelBusy(false))
         },
         [bankId, loadModels, t],
@@ -1492,7 +1640,7 @@ window.__ModuleLoader__.load({
                           ),
                           h(
                             'button',
-                            { className: 'dhc-btn', type: 'button', disabled: modelBusy, onClick: () => modelAction('POST', { id: model.id, action: 'dry-run' }) },
+                            { className: 'dhc-btn', type: 'button', disabled: modelBusy, onClick: () => modelAction('POST', { id: model.id, name: model.name, action: 'dry-run' }) },
                             t('mmDryRun'),
                           ),
                           h(
@@ -2180,6 +2328,7 @@ window.__ModuleLoader__.load({
         tabs,
         body,
         tab === 'client' || tab === 'raw' ? footer : null,
+        h(ModelPreviewModal, { t, preview: modelPreview, onClose: () => setModelPreview(null) }),
       )
     }
 
