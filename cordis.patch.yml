@@ -1,0 +1,20 @@
+# Profile layer for dsh-hindsight-config — the umbrella bundle.
+#
+# One install gives you BOTH halves of the integration:
+#   1. `hindsight`        the memory engine (@vectorize-io/hindsight-coding-agents)
+#   2. `hindsight-config` this package's Host routes + the configuration panel
+#
+# The engine row keeps the id the official bundle uses (`hindsight`) ON PURPOSE:
+# the Loader keys rows by id, so when the official bundle is also selected in
+# this profile the second row of that id replaces the first instead of mounting
+# a second copy. Two mounted copies register all eight `hindsight_*` tools twice
+# in one process.
+#
+# The engine row is what keeps the panel honest: the panel can talk to the
+# Hindsight server on its own, but memory only happens in DSH while that row is
+# mounted — the panel reports which of the two states you are in.
+- insert:
+    - id: hindsight
+      name: "@vectorize-io/hindsight-coding-agents/dsh"
+    - id: hindsight-config
+      name: dsh-hindsight-config

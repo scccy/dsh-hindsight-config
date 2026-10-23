@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Hindsight 记忆配置",
+    "description": "在本页配置 Hindsight 记忆插件：客户端连接与写入策略写入本机配置文件，bank 统计与配置通过 HTTP 修改远端服务端。"
+  }
+}

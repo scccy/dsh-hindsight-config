@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Hindsight memory configuration",
+    "description": "Configure the Hindsight memory plugin here: client connection and retain policy go to this machine's config file, while bank stats and bank configuration are changed over HTTP on the remote server."
+  }
+}

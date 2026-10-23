@@ -1,0 +1,62 @@
+{
+  "name": "dsh-hindsight-config",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Umbrella bundle for Hindsight coding-agent memory in DeepSeek Harness: the memory engine plus a visual configuration panel (local client settings, and server-side bank data over HTTP). · Hindsight 记忆的可视化配置面板（伞包：引擎 + 面板）。",
+  "license": "MIT",
+  "author": "scccy",
+  "homepage": "https://github.com/scccy/dsh-hindsight-config#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scccy/dsh-hindsight-config.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scccy/dsh-hindsight-config/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "hindsight",
+    "memory",
+    "long-term-memory",
+    "agent-memory"
+  ],
+  "engines": {
+    "dsh": ">=0.2.0-0"
+  },
+  "dependencies": {
+    "@vectorize-io/hindsight-coding-agents": "^0.8.2"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./fields.js": "./fields.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "fields.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "icon": "icon.svg",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
