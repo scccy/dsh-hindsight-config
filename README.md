@@ -85,7 +85,7 @@ npm publish
 | --- | --- |
 | 状态 | **记忆引擎**是否挂载 + 引擎版本 + 表单字段基准；服务端连通性（`/health`、`/version`、特性位）；配置路径与生效值 |
 | 客户端配置 | 48 个字段 / 8 组：连接、注入与召回、写入与成本、仓库摄取、知识页、作用范围、诊断、高级对象 |
-| 服务端 | bank 列表 + 统计（文档/节点/观测/待处理/失败/上次整合）+ **bank 别名**（增删、设为显示名）+ 15 个 bank 配置项（`PATCH /v1/default/banks/{id}/config`） |
+| 服务端 | bank 列表 + 统计（文档/节点/观测/待处理/失败/上次整合）+ **心智模型**（列表/刷新/预览/编辑/删除）+ **bank 别名**（增删、设为显示名）+ 15 个 bank 配置项（`PATCH /v1/default/banks/{id}/config`） |
 | 原始 JSON | 整份 `~/.hindsight/coding-agent.json`，带校验；未知字段原样保留 |
 | 诊断 | 生效值与来源（默认/env/文件/harness 覆盖）、生效中的环境变量、`plugin.log` / `diag.jsonl` / `usage.jsonl` 尾部 |
 
@@ -95,6 +95,26 @@ npm publish
 
 - `已挂载` / `未安装` / `已安装，但未激活`（附 fiber 状态与 Loader 行 id）
 - 引擎版本与**表单字段基准**（`fields.js` 的 `ENGINE_BASELINE`，当前 `0.8.2`）不一致时给黄条 —— 新字段可能还没进表单，用「原始 JSON」改或更新面板。
+
+---
+
+## 心智模型（知识页）怎么配
+
+心智模型是服务端的原语，**知识页就是心智模型**。同一个页有两个 id，指向同一份记录：`kp-…`（知识树里的节点）和 `mm-…`（`/mental-models` 里的模型）—— 从任一侧 PATCH，另一侧立刻能看到（`test/mental-model-probe.mjs` 实证）。面板用的是 `mm-…`。
+
+写入方向是 **客户端配置 → 引擎 → 服务端**。引擎每次会话检查漂移，把服务端改回配置的样子，所以：
+
+| 页 | 引擎会重推什么 | 面板编辑时怎么办 |
+| --- | --- | --- |
+| 5 张内置页（taxonomy） | `source_query` + `tags` + `trigger` | 改 `source_query` 时**同时写客户端配置**（`pages.<页名>.source_query`），否则下次会话被覆盖 |
+| initiative 页 / 自建页 | 只重推 `trigger`；`name`/`source_query` 只写一次 | `source_query` 直接 PATCH 即可，引擎不碰 |
+
+面板的行为：
+
+- **编辑 source_query**：先 PATCH 服务端（立刻生效），若该页属于内置 taxonomy，再把同一句写入 `pages`，并在界面上回报"同时已写入客户端配置"。
+- **编辑刷新 cron**：只 PATCH 服务端，并明确提示"内置页的刷新节奏由配置里的全局策略托管，下次会话会被重推"。服务端**不接受 Jenkins 的 `H`**（引擎在客户端侧解析它），面板直接拒绝并提示填具体 5 段 cron。
+- **刷新 / 预览（dry-run）/ 清空**：纯服务端操作，与配置无关。
+- **删除**：纯服务端；内置页删掉后下次会话会被重新播种（想永久去掉请在 `pages` 里设 `false`）。
 
 ---
 
@@ -141,11 +161,14 @@ bank id 由**目录名**推导（`coding-agent::{gitProject}`），工作区标�
 ## 测试
 
 ```bash
-node test/smoke.mjs            # Host 8 条路由 / 真实端点 / 不可达错误 / 引擎自检 / patch 形状
-node test/save-roundtrip.mjs   # 写入回环（临时文件，不动真实配置）
-node test/client-contract.mjs  # 客户端契约：两处注册、字典键一致、summary/page 渲染
-node test/fiber-harness.mjs    # 真实 cordis：apply 是否落定（抓过 "did not activate"）
-node test/engine-mount.mjs     # 引擎能否被外部挂载 / 挂两次会不会重复注册工具
+node test/smoke.mjs              # Host 路由 / 真实端点 / 不可达错误 / 引擎自检 / patch 形状
+node test/save-roundtrip.mjs     # 写入回环（临时文件，不动真实配置）
+node test/client-contract.mjs    # 客户端契约：两处注册、字典键一致、summary/page 渲染
+node test/fiber-harness.mjs      # 真实 cordis：apply 是否落定（抓过 "did not activate"）
+node test/engine-mount.mjs       # 引擎能否被外部挂载 / 挂两次会不会重复注册工具
+node test/alias-roundtrip.mjs    # bank 别名：增删/primary/中文名/重复拒绝（临时 bank，跑完即删）
+node test/mental-model-routes.mjs # 心智模型：列表/编辑/配置同步/cron 校验/删除（临时 bank）
+node test/mental-model-probe.mjs # 探查：kp- 与 mm- 两个 id 是否同一份记录
 ```
 
 两个测试需要本机有一份 Harness 安装或引擎副本，找不到会打印 `SKIP` 并以 0 退出：

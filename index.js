@@ -15,7 +15,7 @@
 import { readFile, writeFile, rename, mkdir, stat, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { FIELDS, GROUPS, HARNESS, KNOWN_EXTRA_KEYS, coerce, immediateKeys, ENGINE_BASELINE, ENGINE_PACKAGE } from './fields.js'
+import { FIELDS, GROUPS, HARNESS, KNOWN_EXTRA_KEYS, coerce, immediateKeys, ENGINE_BASELINE, ENGINE_PACKAGE, TAXONOMY_PAGES, taxonomyName } from './fields.js'
 
 export const name = 'hindsight-config'
 export const inject = []
@@ -398,6 +398,41 @@ function curatedBankFields(config) {
   ].map((entry) => ({ ...entry, value: config?.[entry.key] ?? null }))
 }
 
+/**
+ * Persist a taxonomy page's question into the client config, which is the input
+ * the engine re-pushes from every session. Without this, a server-side edit to a
+ * seeded page is silently undone at the next session.
+ *
+ * Returns what happened so the UI can say it out loud.
+ */
+async function writePageSourceQuery(name, sourceQuery) {
+  const canonical = taxonomyName(name)
+  if (!canonical) return { written: false, reason: 'not-taxonomy' }
+  const file = await readConfigFile()
+  if (file.parseError) return { written: false, reason: 'config-unreadable', detail: file.parseError }
+  const raw = { ...file.raw }
+  const pages = { ...(raw.pages && typeof raw.pages === 'object' && !Array.isArray(raw.pages) ? raw.pages : {}) }
+  // Match an existing key case-insensitively so we do not create a duplicate.
+  const existingKey = Object.keys(pages).find((key) => key.toLowerCase() === canonical.toLowerCase()) ?? canonical
+  const current = pages[existingKey]
+  if (current === false) {
+    // `false` means "do not seed this page"; an edit is an explicit intent to keep it.
+    pages[existingKey] = { source_query: sourceQuery }
+  } else if (current && typeof current === 'object') {
+    pages[existingKey] = { ...current, source_query: sourceQuery }
+  } else {
+    pages[existingKey] = { source_query: sourceQuery }
+  }
+  raw.pages = pages
+  await writeConfigFile(raw)
+  return { written: true, key: existingKey }
+}
+
+/** The five seeded page names, so the UI can flag which edits are config-owned. */
+function taxonomyList() {
+  return [...TAXONOMY_PAGES]
+}
+
 /* --------------------------------------------------------------------- apply */
 
 export function apply(ctx) {
@@ -630,6 +665,108 @@ export function apply(ctx) {
         return json(res, 200, { ok: true, bankId, alias, removed: true })
       }
       return json(res, 405, { ok: false, error: '仅支持 GET / POST / PATCH / DELETE' })
+    })
+
+    // Mental models = the server-side primitive behind knowledge pages. A page
+    // has two ids (kp-… in the knowledge tree, mm-… here) over one record: a
+    // PATCH through either surface is visible through the other, so edits made
+    // here are what the engine's drift check sees.
+    route('/mental-models', async (req, res) => {
+      const file = await readConfigFile()
+      const url = new URL(req.url || '/', 'http://localhost')
+      const bankId = String(url.searchParams.get('bankId') || '')
+      if (!bankId) return json(res, 400, { ok: false, error: '缺少 bankId' })
+      const result = await upstream(file.raw, `/v1/default/banks/${encodeURIComponent(bankId)}/mental-models`)
+      if (!result.ok) return json(res, 200, { ok: false, error: result })
+      const taxonomy = taxonomyList()
+      const items = (result.data?.items ?? []).map((model) => ({
+        id: model.id,
+        name: model.name,
+        tags: model.tags,
+        sourceQuery: model.source_query,
+        maxTokens: model.max_tokens,
+        trigger: model.trigger,
+        lastRefreshedAt: model.last_refreshed_at,
+        lastRefreshFailedAt: model.last_refresh_failed_at,
+        isStale: model.is_stale,
+        isTaxonomy: Boolean(taxonomyName(model.name)),
+      }))
+      json(res, 200, { ok: true, bankId, models: items, taxonomy })
+    })
+
+    route('/mental-model', async (req, res) => {
+      const file = await readConfigFile()
+      const body = req.method === 'GET' || req.method === 'DELETE' ? {} : await readBody(req)
+      const url = new URL(req.url || '/', 'http://localhost')
+      const bankId = String(body.bankId || url.searchParams.get('bankId') || '')
+      const id = String(body.id || url.searchParams.get('id') || '')
+      if (!bankId || !id) return json(res, 400, { ok: false, error: '缺少 bankId 或 id' })
+      const base = `/v1/default/banks/${encodeURIComponent(bankId)}/mental-models/${encodeURIComponent(id)}`
+
+      if (req.method === 'GET') {
+        const result = await upstream(file.raw, base)
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, model: result.data })
+      }
+      if (req.method === 'DELETE') {
+        const result = await upstream(file.raw, base, { method: 'DELETE' })
+        if (!result.ok) return json(res, 200, { ok: false, error: result })
+        return json(res, 200, { ok: true, removed: true })
+      }
+      if (req.method !== 'PATCH') return json(res, 405, { ok: false, error: '仅支持 GET / PATCH / DELETE' })
+
+      const patch = {}
+      if (typeof body.sourceQuery === 'string') patch.source_query = body.sourceQuery
+      if (typeof body.name === 'string' && body.name.trim()) patch.name = body.name.trim()
+      if (body.maxTokens !== undefined && body.maxTokens !== null && body.maxTokens !== '') {
+        const tokens = Number(body.maxTokens)
+        if (!Number.isFinite(tokens) || tokens <= 0) return json(res, 400, { ok: false, error: 'max_tokens 必须是正整数' })
+        patch.max_tokens = Math.trunc(tokens)
+      }
+      if (typeof body.refreshCron === 'string' && body.refreshCron.trim()) {
+        const cron = body.refreshCron.trim()
+        // The server rejects Jenkins' `H`; the engine resolves it client-side
+        // before creating a page. Refuse it here instead of sending a 422.
+        if (/\bH\b/.test(cron)) {
+          return json(res, 400, {
+            ok: false,
+            error: 'H 是引擎客户端侧写法，服务端不接受。这里请填具体 5 段 cron，例如 "17 * * * *"。',
+          })
+        }
+        patch.trigger = { refresh_cron: cron }
+      }
+      if (!Object.keys(patch).length) return json(res, 400, { ok: false, error: '没有要写入的变更' })
+
+      const result = await upstream(file.raw, base, { method: 'PATCH', body: patch })
+      if (!result.ok) return json(res, 200, { ok: false, error: result })
+
+      // A seeded page's question lives in the client config too; write it there
+      // so the engine's next-session re-sync does not undo the edit.
+      let configWrite = { written: false, reason: 'no-source-query' }
+      if (patch.source_query !== undefined) {
+        const model = result.data ?? {}
+        configWrite = await writePageSourceQuery(model.name ?? body.name ?? '', patch.source_query)
+      }
+      json(res, 200, { ok: true, patched: Object.keys(patch), configWrite })
+    })
+
+    route('/mental-model-action', async (req, res) => {
+      if (req.method !== 'POST') return json(res, 405, { ok: false, error: '仅支持 POST' })
+      const body = await readBody(req)
+      const file = await readConfigFile()
+      const bankId = String(body.bankId || '')
+      const id = String(body.id || '')
+      const action = String(body.action || '')
+      if (!bankId || !id) return json(res, 400, { ok: false, error: '缺少 bankId 或 id' })
+      if (!['refresh', 'dry-run', 'clear'].includes(action)) return json(res, 400, { ok: false, error: '未知操作' })
+      const suffix = action === 'refresh' ? 'refresh' : action === 'dry-run' ? 'dry-run-refresh' : 'clear'
+      const result = await upstream(
+        file.raw,
+        `/v1/default/banks/${encodeURIComponent(bankId)}/mental-models/${encodeURIComponent(id)}/${suffix}`,
+        { method: 'POST', timeoutMs: action === 'refresh' ? 120000 : 60000 },
+      )
+      if (!result.ok) return json(res, 200, { ok: false, error: result })
+      json(res, 200, { ok: true, action, result: result.data })
     })
 
     route('/logs', async (req, res) => {

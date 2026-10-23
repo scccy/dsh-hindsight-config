@@ -114,6 +114,24 @@ window.__ModuleLoader__.load({
       aliasPrimary: '显示名',
       aliasMakePrimary: '设为显示名',
       aliasRemove: '删除',
+      mmTitle: '心智模型（知识页）',
+      mmHint: '心智模型就是知识页。编辑会立刻 PATCH 到服务端；内置五页的问法与刷新节奏由客户端配置托管，下次会话会被重推，所以改它们的 source_query 时面板会同时写入客户端配置。',
+      mmNone: '还没有心智模型（这个 bank 还没播种知识页）',
+      mmTaxonomy: '内置页',
+      mmStale: '待刷新',
+      mmFailed: '刷新失败',
+      mmLastRefreshed: '上次刷新',
+      mmLastFailed: '上次失败',
+      mmRefresh: '刷新',
+      mmDryRun: '预览',
+      mmEdit: '编辑',
+      mmDelete: '删除',
+      mmCancel: '取消',
+      mmCronPlaceholder: '刷新 cron，如 17 * * * *（服务端不接受 H）',
+      mmTaxonomyWarn: '这是内置页：source_query 会同时写入客户端配置（pages），否则下次会话被覆盖；刷新 cron 只改服务端，会被配置里的全局节奏重推。',
+      mmOwnWarn: '这一页不归内置分类托管：source_query 可以直接改，引擎不会覆盖。',
+      mmConfigAlso: '同时已写入客户端配置',
+      mmConfigWriteFailed: '服务端已改，但写客户端配置失败',
       bankApplied: '已写入服务端',
       bankOverride: '已有覆盖',
       advanced: '高级对象',
@@ -227,6 +245,24 @@ window.__ModuleLoader__.load({
       aliasPrimary: 'shown as',
       aliasMakePrimary: 'Show as this name',
       aliasRemove: 'Remove',
+      mmTitle: 'Mental models (knowledge pages)',
+      mmHint: 'A mental model is a knowledge page. Edits PATCH the server immediately. The five seeded pages take their question and refresh policy from the client config and are re-pushed next session, so editing their source_query also writes the config.',
+      mmNone: 'No mental models yet (this bank has not seeded its pages)',
+      mmTaxonomy: 'seeded',
+      mmStale: 'stale',
+      mmFailed: 'refresh failed',
+      mmLastRefreshed: 'last refreshed',
+      mmLastFailed: 'last failed',
+      mmRefresh: 'Refresh',
+      mmDryRun: 'Preview',
+      mmEdit: 'Edit',
+      mmDelete: 'Delete',
+      mmCancel: 'Cancel',
+      mmCronPlaceholder: 'refresh cron, e.g. 17 * * * * (the server rejects H)',
+      mmTaxonomyWarn: 'Seeded page: source_query is also written to the client config (pages), otherwise the next session overwrites it. A cron change here only touches the server and is re-pushed from the global policy.',
+      mmOwnWarn: 'This page is not part of the seeded taxonomy: source_query is safe to edit, the engine will not overwrite it.',
+      mmConfigAlso: 'Also written to the client config',
+      mmConfigWriteFailed: 'Server updated, but writing the client config failed',
       bankApplied: 'Written to server',
       bankOverride: 'overridden',
       advanced: 'Advanced objects',
@@ -513,6 +549,10 @@ window.__ModuleLoader__.load({
       const [aliasDraft, setAliasDraft] = useState('')
       const [aliasBusy, setAliasBusy] = useState(false)
       const [aliasMsg, setAliasMsg] = useState(null)
+      const [models, setModels] = useState({ status: 'idle', items: [], taxonomy: [] })
+      const [modelEdit, setModelEdit] = useState(null)
+      const [modelBusy, setModelBusy] = useState(false)
+      const [modelMsg, setModelMsg] = useState(null)
       const [logFile, setLogFile] = useState('plugin')
       const [logState, setLogState] = useState({ status: 'idle' })
 
@@ -672,6 +712,82 @@ window.__ModuleLoader__.load({
           .catch((error) => setBankDetail({ status: 'done', data: { ok: false, error: { message: String(error.message || error) } } }))
       }, [])
 
+      const loadModels = useCallback((id) => {
+        if (!id) return
+        setModels((previous) => ({ ...previous, status: 'loading' }))
+        api(`/mental-models?bankId=${encodeURIComponent(id)}`)
+          .then((data) => {
+            if (!data.ok) {
+              setModels({ status: 'done', items: [], taxonomy: [], error: data.error })
+              return
+            }
+            setModels({ status: 'done', items: data.models || [], taxonomy: data.taxonomy || [] })
+          })
+          .catch((error) => setModels({ status: 'done', items: [], taxonomy: [], error: { message: String(error.message || error) } }))
+      }, [])
+
+      const modelAction = useCallback(
+        (method, payload, done) => {
+          setModelBusy(true)
+          setModelMsg(null)
+          const path = method === 'PATCH' || method === 'DELETE' ? '/mental-model' : '/mental-model-action'
+          const query = method === 'DELETE' ? `?bankId=${encodeURIComponent(bankId)}&id=${encodeURIComponent(payload.id)}` : ''
+          api(`${path}${query}`, { method, body: method === 'DELETE' ? undefined : { bankId, ...payload } })
+            .then((data) => {
+              if (!data.ok) {
+                setModelMsg({ tone: 'bad', text: (data.error && (data.error.detail || data.error.message || data.error.error)) || '服务端拒绝了这次操作' })
+                return
+              }
+              if (data.configWrite && data.configWrite.written) {
+                setModelMsg({ tone: 'ok', text: `${t('mmConfigAlso')} (pages[${data.configWrite.key}])` })
+              } else if (data.configWrite && data.configWrite.reason === 'config-unreadable') {
+                setModelMsg({ tone: 'bad', text: `${t('mmConfigWriteFailed')} — ${data.configWrite.detail}` })
+              }
+              if (done) done()
+              loadModels(bankId)
+            })
+            .catch((error) => setModelMsg({ tone: 'bad', text: String(error.message || error) }))
+            .finally(() => setModelBusy(false))
+        },
+        [bankId, loadModels, t],
+      )
+
+      // The list endpoint blanks source_query/trigger/content to stay small, so
+      // the editor reads the detail record before it can show real values.
+      const openModelEditor = useCallback(
+        (model) => {
+          if (modelEdit && modelEdit.id === model.id) {
+            setModelEdit(null)
+            return
+          }
+          setModelMsg(null)
+          setModelEdit({ id: model.id, name: model.name, isTaxonomy: model.isTaxonomy, loading: true, sourceQuery: '', maxTokens: '', refreshCron: '' })
+          api(`/mental-model?bankId=${encodeURIComponent(bankId)}&id=${encodeURIComponent(model.id)}`)
+            .then((data) => {
+              if (!data.ok) {
+                setModelMsg({ tone: 'bad', text: (data.error && (data.error.detail || data.error.message)) || '读取详情失败' })
+                setModelEdit(null)
+                return
+              }
+              const detail = data.model || {}
+              setModelEdit({
+                id: model.id,
+                name: detail.name || model.name,
+                isTaxonomy: model.isTaxonomy,
+                loading: false,
+                sourceQuery: detail.source_query || '',
+                maxTokens: detail.max_tokens ?? '',
+                refreshCron: detail.trigger?.refresh_cron || '',
+              })
+            })
+            .catch((error) => {
+              setModelMsg({ tone: 'bad', text: String(error.message || error) })
+              setModelEdit(null)
+            })
+        },
+        [bankId, modelEdit],
+      )
+
       const loadAliases = useCallback((id) => {
         if (!id) return
         setAliases({ status: 'loading', items: [] })
@@ -693,6 +809,10 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (tab === 'server' && bankId) loadAliases(bankId)
       }, [tab, bankId, loadAliases])
+
+      useEffect(() => {
+        if (tab === 'server' && bankId) loadModels(bankId)
+      }, [tab, bankId, loadModels])
 
       const aliasAction = useCallback(
         (method, payload, done) => {
@@ -1174,6 +1294,162 @@ window.__ModuleLoader__.load({
             : bankDetail.status === 'loading'
               ? h('div', { className: 'dhc-card dhc-muted' }, h(Spinner), ' ', t('bankLoad'))
               : null,
+          detail?.ok
+            ? h(
+                'div',
+                { className: 'dhc-card' },
+                h(
+                  'div',
+                  { className: 'dhc-card-head' },
+                  h('div', { className: 'dhc-card-title' }, t('mmTitle')),
+                  h(
+                    'div',
+                    { className: 'dhc-btns' },
+                    models.status === 'loading' ? h(Spinner) : null,
+                    h('button', { className: 'dhc-btn', type: 'button', onClick: () => loadModels(bankId) }, t('refresh')),
+                  ),
+                ),
+                h('div', { className: 'dhc-group-hint' }, t('mmHint')),
+                models.status === 'done' && models.error
+                  ? h('div', { className: 'dhc-err' }, `${t('errorPrefix')}${models.error.detail || models.error.message || ''}`)
+                  : null,
+                models.status === 'done' && !models.error && !(models.items || []).length
+                  ? h('div', { className: 'dhc-muted' }, t('mmNone'))
+                  : null,
+                h(
+                  'div',
+                  { className: 'dhc-list' },
+                  (models.items || []).map((model) =>
+                    h(
+                      'div',
+                      { key: model.id, style: { borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '8px' } },
+                      h(
+                        'div',
+                        { className: 'dhc-btns', style: { justifyContent: 'space-between' } },
+                        h(
+                          'span',
+                          { className: 'dhc-btns' },
+                          h('span', { className: 'dhc-mono' }, model.name),
+                          model.isTaxonomy ? h(Badge, null, t('mmTaxonomy')) : null,
+                          model.isStale ? h(Badge, { tone: 'warn' }, t('mmStale')) : null,
+                          model.lastRefreshFailedAt ? h(Badge, { tone: 'bad' }, t('mmFailed')) : null,
+                        ),
+                        h(
+                          'span',
+                          { className: 'dhc-btns' },
+                          h(
+                            'button',
+                            { className: 'dhc-btn', type: 'button', disabled: modelBusy, onClick: () => modelAction('POST', { id: model.id, action: 'refresh' }) },
+                            t('mmRefresh'),
+                          ),
+                          h(
+                            'button',
+                            { className: 'dhc-btn', type: 'button', disabled: modelBusy, onClick: () => modelAction('POST', { id: model.id, action: 'dry-run' }) },
+                            t('mmDryRun'),
+                          ),
+                          h(
+                            'button',
+                            {
+                              className: 'dhc-btn',
+                              type: 'button',
+                              onClick: () => openModelEditor(model),
+                            },
+                            t('mmEdit'),
+                          ),
+                          h(
+                            'button',
+                            {
+                              className: 'dhc-btn',
+                              type: 'button',
+                              'data-kind': 'danger',
+                              disabled: modelBusy,
+                              onClick: () => modelAction('DELETE', { id: model.id }),
+                            },
+                            t('mmDelete'),
+                          ),
+                        ),
+                      ),
+                      h(
+                        'div',
+                        { className: 'dhc-muted', style: { fontSize: '11.5px', marginTop: '2px' } },
+                        `${t('mmLastRefreshed')}: ${model.lastRefreshedAt || '—'}`,
+                      ),
+                      model.lastRefreshFailedAt
+                        ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, `${t('mmLastFailed')}: ${model.lastRefreshFailedAt}`)
+                        : null,
+                      modelEdit && modelEdit.id === model.id
+                        ? h(
+                            'div',
+                            { style: { marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' } },
+                            modelEdit.loading
+                              ? h('div', { className: 'dhc-muted' }, h(Spinner), ' ', t('bankLoad'))
+                              : h(
+                                  'div',
+                                  null,
+                                  modelEdit.isTaxonomy
+                                    ? h('div', { className: 'dhc-warn', style: { fontSize: '11.5px' } }, t('mmTaxonomyWarn'))
+                                    : h('div', { className: 'dhc-muted', style: { fontSize: '11.5px' } }, t('mmOwnWarn')),
+                                  h('textarea', {
+                                    className: 'dhc-area',
+                                    rows: 3,
+                                    spellcheck: false,
+                                    placeholder: 'source_query',
+                                    style: { marginTop: '6px' },
+                                    value: modelEdit.sourceQuery,
+                                    onChange: (event) => setModelEdit((current) => ({ ...current, sourceQuery: event.target.value })),
+                                  }),
+                                  h(
+                                    'div',
+                                    { className: 'dhc-btns', style: { marginTop: '6px' } },
+                                    h('input', {
+                                      className: 'dhc-input',
+                                      type: 'number',
+                                      placeholder: 'max_tokens',
+                                      style: { flex: '0 0 140px' },
+                                      value: modelEdit.maxTokens,
+                                      onChange: (event) => setModelEdit((current) => ({ ...current, maxTokens: event.target.value })),
+                                    }),
+                                    h('input', {
+                                      className: 'dhc-input',
+                                      type: 'text',
+                                      spellcheck: false,
+                                      placeholder: t('mmCronPlaceholder'),
+                                      style: { flex: '1 1 160px' },
+                                      value: modelEdit.refreshCron,
+                                      onChange: (event) => setModelEdit((current) => ({ ...current, refreshCron: event.target.value })),
+                                    }),
+                                    h(
+                                      'button',
+                                      {
+                                        className: 'dhc-btn',
+                                        type: 'button',
+                                        'data-kind': 'primary',
+                                        disabled: modelBusy,
+                                        onClick: () =>
+                                          modelAction(
+                                            'PATCH',
+                                            {
+                                              id: modelEdit.id,
+                                              sourceQuery: modelEdit.sourceQuery,
+                                              maxTokens: modelEdit.maxTokens === '' ? undefined : modelEdit.maxTokens,
+                                              refreshCron: modelEdit.refreshCron || undefined,
+                                            },
+                                            () => setModelEdit(null),
+                                          ),
+                                      },
+                                      t('save'),
+                                    ),
+                                    h('button', { className: 'dhc-btn', type: 'button', onClick: () => setModelEdit(null) }, t('mmCancel')),
+                                  ),
+                                ),
+                          )
+                        : null,
+                    ),
+                  ),
+                ),
+                modelMsg ? h('div', { className: modelMsg.tone === 'ok' ? 'dhc-ok' : 'dhc-err', style: { marginTop: '8px' } }, modelMsg.text) : null,
+              )
+            : null,
           detail?.ok
             ? h(
                 'div',

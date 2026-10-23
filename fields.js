@@ -356,6 +356,26 @@ export const ENGINE_BASELINE = '0.8.2'
 /** Package whose Host row is the memory engine this panel configures. */
 export const ENGINE_PACKAGE = '@vectorize-io/hindsight-coding-agents'
 
+/**
+ * The five pages the engine seeds from its taxonomy (dist/deepen.js PAGE_TAXONOMY).
+ * Their `source_query`/`tags`/`trigger` are re-pushed from the client config on
+ * every session, so an edit must land in BOTH places to survive: the config
+ * (`pages.<name>.source_query`) and the server.
+ */
+export const TAXONOMY_PAGES = [
+  'Component map',
+  'Core concepts',
+  'Conventions and patterns',
+  'Key decisions and rationale',
+  'Initiatives and enhancements',
+]
+
+/** Case-insensitive taxonomy lookup, matching how the engine matches page names. */
+export function taxonomyName(name) {
+  const wanted = String(name || '').trim().toLowerCase()
+  return TAXONOMY_PAGES.find((page) => page.toLowerCase() === wanted) ?? null
+}
+
 /** Fields whose saved value applies without a host restart. */
 export function immediateKeys() {
   return FIELDS.filter((field) => field.restart === false).map((field) => field.key)
