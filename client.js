@@ -514,6 +514,12 @@ window.__ModuleLoader__.load({
     }
 
     function FieldControl({ t, field, text, onChange, disabled }) {
+      const loc = isZhNow() ? 'zh' : 'en'
+      const optionLabel = (value) => {
+        const map = field.optionLabels && field.optionLabels[value]
+        if (!map) return value
+        return typeof map === 'string' ? map : map[loc] || map.zh
+      }
       if (field.type === 'boolean') {
         return h(
           'select',
@@ -528,7 +534,7 @@ window.__ModuleLoader__.load({
           'select',
           { className: 'dhc-select', value: text, disabled, onChange: (event) => onChange(event.target.value) },
           h('option', { value: '' }, t('follow')),
-          field.options.map((option) => h('option', { key: option, value: option }, option)),
+          field.options.map((option) => h('option', { key: option, value: option }, optionLabel(option))),
         )
       }
       if (field.type === 'secret') {
@@ -566,7 +572,7 @@ window.__ModuleLoader__.load({
           onChange: (event) => onChange(event.target.value),
         })
       }
-      return h('input', {
+      const input = h('input', {
         className: 'dhc-input',
         type: 'text',
         spellcheck: false,
@@ -575,6 +581,30 @@ window.__ModuleLoader__.load({
         disabled,
         onChange: (event) => onChange(event.target.value),
       })
+      if (!field.presets || !field.presets.length) return input
+      return h(
+        'div',
+        { className: 'dhc-control' },
+        input,
+        h(
+          'div',
+          { className: 'dhc-btns', style: { marginTop: '6px' } },
+          field.presets.map((preset) =>
+            h(
+              'button',
+              {
+                key: preset.value,
+                className: 'dhc-btn',
+                type: 'button',
+                'data-kind': String(text) === preset.value ? 'primary' : undefined,
+                disabled,
+                onClick: () => onChange(preset.value),
+              },
+              preset.label ? (typeof preset.label === 'string' ? preset.label : preset.label[loc] || preset.label.zh) : preset.value,
+            ),
+          ),
+        ),
+      )
     }
 
     function sourceLabel(t, source) {

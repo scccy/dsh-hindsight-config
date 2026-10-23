@@ -85,6 +85,11 @@ export const FIELDS = [
   f('serverMode', 'connection', 'select', {
     default: 'cloud',
     options: ['cloud', 'self-hosted', 'daemon'],
+    optionLabels: {
+      cloud: { zh: '官方云（托管）', en: 'Hosted cloud' },
+      'self-hosted': { zh: '自建 HTTP 服务（跨机器）', en: 'Self-hosted HTTP (cross-machine)' },
+      daemon: { zh: '本机托管进程', en: 'Local managed process' },
+    },
     env: 'HINDSIGHT_SERVER_MODE',
     help: {
       zh: 'cloud = 官方云；self-hosted = 你自己部署的 HTTP 服务（跨机器就选这个）；daemon = 本机托管进程。',
@@ -133,6 +138,12 @@ export const FIELDS = [
   f('autoInject', 'inject', 'select', {
     default: 'reflect',
     options: ['reflect', 'pages', 'recall', 'none'],
+    optionLabels: {
+      reflect: { zh: 'reflect：低预算综合（失败自动降级）', en: 'reflect: low-budget synthesis (falls back)' },
+      pages: { zh: 'pages：检索知识页', en: 'pages: knowledge-page retrieval' },
+      recall: { zh: 'recall：召回记忆', en: 'recall: memory recall' },
+      none: { zh: 'none：不注入', en: 'none: inject nothing' },
+    },
     help: {
       zh: '会话第一条提示注入什么：reflect（低预算综合，失败降级）/ pages（知识页检索）/ recall（记忆召回）/ none（不注入）。',
       en: 'What the first prompt injects: reflect (low-budget synthesis with fallbacks) / pages / recall / none.',
@@ -261,6 +272,11 @@ export const FIELDS = [
   f('pageTriggerType', 'pages', 'select', {
     default: 'cron',
     options: ['cron', 'auto-refresh', 'manual'],
+    optionLabels: {
+      cron: { zh: '按 cron 定时（默认，每小时错峰）', en: 'On a cron schedule (default, hourly staggered)' },
+      'auto-refresh': { zh: '每次整合后自动刷新', en: 'Auto-refresh after every consolidation' },
+      manual: { zh: '手动（不自动刷新）', en: 'Manual (no auto refresh)' },
+    },
     help: {
       zh: '知识页何时刷新：cron（默认，每小时错峰）/ 每次整合后 / 手动。',
       en: 'When pages refresh: cron (hourly, staggered) / after every consolidation / manual.',
@@ -269,9 +285,15 @@ export const FIELDS = [
   f('pageTriggerCron', 'pages', 'string', {
     default: 'H * * * *',
     placeholder: 'H * * * *',
+    presets: [
+      { value: 'H * * * *', label: { zh: '每小时错峰（默认）', en: 'Hourly, staggered (default)' } },
+      { value: 'H */6 * * *', label: { zh: '每 6 小时', en: 'Every 6 hours' } },
+      { value: 'H 3 * * *', label: { zh: '每天 3 点', en: 'Daily 03:00' } },
+      { value: '0 * * * *', label: { zh: '每小时整点', en: 'Hourly on the hour' } },
+    ],
     help: {
-      zh: 'UTC 五段 cron；把某段写成 H 让每页错峰。',
-      en: 'Five-field UTC cron; write H in a field to stagger each page.',
+      zh: 'UTC 五段 cron；把某段写成 H 让每页错峰（避免所有页同一时刻一起刷新）。仅在「知识页何时刷新」选 cron 时生效。',
+      en: 'Five-field UTC cron; write H in a field to stagger each page (so they do not all refresh at once). Only used when "when pages refresh" is cron.',
     },
   }),
 
