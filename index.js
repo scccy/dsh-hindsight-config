@@ -690,8 +690,10 @@ export function apply(ctx) {
       }
       const taxonomy = taxonomyList()
       const items = (result.data?.items ?? []).map((model) => {
-        // `last_refresh_failed_at` is sticky: it survives a later success, so the
-        // badge must compare the two instants rather than test for presence.
+        // The server clears `last_refresh_failed_at` once a refresh succeeds
+        // (verified: it was 16:23:41, then empty after a 17:36 success). Compare
+        // the two instants anyway so a server that ever kept both cannot leave a
+        // stale red badge on a healthy page.
         const failedAt = model.last_refresh_failed_at ? Date.parse(model.last_refresh_failed_at) : 0
         const refreshedAt = model.last_refreshed_at ? Date.parse(model.last_refreshed_at) : 0
         return {
